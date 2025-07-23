@@ -77,7 +77,43 @@ void QPSk(comp *Qpsk,unsigned char * data,int len ,int N)
    }
  return;
 }
+int che(char *A)
+{
+  if(A[0]<30) return 0 ;
+  return 1;
 
+}
+
+int chconn(int long long sock)
+{
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(sock, &readfds);
+
+    TIMEVAL timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 0; // non-blocking
+
+    int sel = select(0, &readfds, NULL, NULL, &timeout);
+    if (sel > 0 && FD_ISSET(sock, &readfds)) {
+        // Now it's safe to peek
+        char buffer;
+        int result = recv(sock, &buffer, 1, MSG_PEEK);
+        if (result == 0) {
+            return true; // socket closed by peer
+        } else if (result == SOCKET_ERROR) {
+            int err = WSAGetLastError();
+            if (err == WSAEWOULDBLOCK) {
+                return false; // no data, but socket still open
+            }
+            std::cerr << "recv error: " << err << std::endl;
+            return true; // error = likely closed
+        } else {
+            return false; // data available, socket open
+        }
+    }
+    return false; // not ready, likely still open
+}
 void com2re(short *A,short *B, int len)
 {
 
@@ -108,10 +144,10 @@ class adalm
   adalm() {   mp[0]="iio:device0",mp[1]="iio:device1",mp[2]="iio:device2",mp[3]="iio:device3";
   t[0][0]="OUTPUT", t[0][1]="OUTPUT", t[0][2]="DEBUG", t[0][3]="INPUT" , t[0][4]="INPUT", t[0][5]="INPUT", t[0][6]="OUTPUT", t[0][7]="INPUT", t[0][8]="OUTPUT", t[0][9]="OUTPUT";
    t[1][0]="INPUT", t[1][1]="INPUT", t[1][2]="INPUT", t[1][3]="INPUT", t[1][4]="INPUT", t[1][5]="INPUT", t[1][6]="INPUT", t[1][7]="INPUT", t[1][8]="INPUT", t[1][9]="" ;
-  t[2][0]="", t[2][1]="OUTPUT", t[2][2]="OUTPUT", t[2][3]="OUTPUT", t[2][4]="", t[2][5]="DEBUG", t[2][4]="OUTPUT", t[2][5]="OUTPUT";
+  t[2][0]="", t[2][1]="DEBUG", t[2][2]="OUTPUT", t[2][3]="OUTPUT", t[2][4]="", t[2][5]="DEBUG", t[2][4]="OUTPUT", t[2][5]="OUTPUT",t[2][6]="OUTPUT";;
    t[3][2]="", t[3][3]="DEBUG",t[3][2]="INPUT", t[3][3]="INPUT";
   }
-
+string av="";
 intcontrol(char *ip)
 {
  con = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -220,7 +256,7 @@ da=da+" 00000003\r\n";
     }
     int g=0,e=0,m=0;
 
-    cout<<recv(wr, recvBuffer,2, 0)<<endl;
+    recv(wr, recvBuffer,2, 0);
 
   do{
     g= send(wr, recvBuffer, bufsize, 0);
@@ -242,8 +278,8 @@ da=da+" 00000003\r\n";
     }
     int g=0,e=0,m=0;
     char G[12];
-    cout<<recv(re, G, to_string(bufsize).length()+1, 0)<<endl;
-    cout<<recv(re, G, 9, 0)<<endl;
+    recv(re, G, to_string(bufsize).length()+1, 0);
+    recv(re, G, 9, 0);
   do{
     g= recv(re, &recvBuffer[m], bufsize, 0);
 
@@ -251,13 +287,11 @@ da=da+" 00000003\r\n";
 
 
     }
-    if (g < 0) {
-    int wsa_error = WSAGetLastError();
-    printf("WSA Error: %d\n", wsa_error);
-      e++;
-}
+    if (g < 0) e++;
 
-    if(e>100)return -1;
+    if(e>100){ int wsa_error = WSAGetLastError();
+    printf("WSA Error: %d\n", wsa_error);
+            return -1;}
   }while(g<1||m<bufsize);
 
   return m;
@@ -271,7 +305,18 @@ da=da+" 00000003\r\n";
  cout<<"\nde2:\n0-altvoltage0\n1-altvoltage1\n2-altvoltage2\n3-altvoltage3\n4-buff\n5-debug\n6-voltage0\n7-voltage1"<<endl;
   cout<<"\nde3:\n0-buff\n1-debug\n2-voltage0\n3-voltage1"<<endl;
  }
+int sam_av(int ud)
+{ud=0;
+    char C[100];
+    int d =av.find(' ');
+    int b= av.find(' ',d+1);
+   if(ud) atoi(  av.substr(1, d-1).c_str());
 
+   else{
+    return atoi(av.substr(b,(av.length()-b)-1).c_str());
+   }
+
+}
 int fir(char *a,int bw,int sample)
 {
   if(bw==20000000&&sample==1000000) strcpy(a,"RX 3 GAIN -6 DEC 4.TX 3 GAIN 0 INT 4.-15,-15.-27,-27.-23,-23.-6,-6.17,17.33,33.31,31.9,9.-23,-23.-47,-47.-45,-45.-13,-13.34,34.69,69.67,67.21,21.-49,-49.-102,-102.-99,-99.-32,-32.69,69.146,146.143,143.48,48.-96,-96.-204,-204.-200,-200.-69,-69.129,129.278,278.275,275.97,97.-170,-170.-372,-372.-371,-371.-135,-135.222,222.494,494.497,497.187,187.-288,-288.-654,-654.-665,-665.-258,-258.376,376.875,875.902,902.363,363.-500,-500.-1201,-1201.-1265,-1265.-530,-530.699,699.1748,1748.1906,1906.845,845.-1089,-1089.-2922,-2922.-3424,-3424.-1697,-1697.2326,2326.7714,7714.12821,12821.15921,15921.15921,15921.12821,12821.7714,7714.2326,2326.-1697,-1697.-3424,-3424.-2922,-2922.-1089,-1089.845,845.1906,1906.1748,1748.699,699.-530,-530.-1265,-1265.-1201,-1201.-500,-500.363,363.902,902.875,875.376,376.-258,-258.-665,-665.-654,-654.-288,-288.187,187.497,497.494,494.222,222.-135,-135.-371,-371.-372,-372.-170,-170.97,97.275,275.278,278.129,129.-69,-69.-200,-200.-204,-204.-96,-96.48,48.143,143.146,146.69,69.-32,-32.-99,-99.-102,-102.-49,-49.21,21.67,67.69,69.34,34.-13,-13.-45,-45.-47,-47.-23,-23.9,9.31,31.33,33.17,17.-6,-6.-23,-23.-27,-27.-15,-15..");
@@ -298,12 +343,13 @@ if(ch>-1)
         for (const auto& channel : channels[de]) {
 
 
-cout<<channel.first<<endl;
+
         if(i==ch){se=se+t[de][ch]+' ';
 
             string cha = channel.first.substr(0, channel.first.find('_'));
 
-                se+=cha +' '+channels[de][channel.first][art]+' ';
+               if(t[de][ch]!="DEBUG") se+=cha +' '+channels[de][channel.first][art]+' ';
+else se+=channels[de][channel.first][art]+' ';
 
         break;}
         i++;
@@ -350,9 +396,14 @@ while(send(con,data,strlen(data)+1,0)==-1){
     }
 }
 char ch[5];
-er=recv(con,ch,to_string(strlen(data)).length(),0);
 
-cout<<ch<<endl;
+GGG:
+er=recv(con,ch,10,0);
+cout<<che(ch)<<endl;
+if(!che(ch)&&er!=-1) goto GGG;
+
+//ch[abs(er)]='\0';
+
 if(er==-1)
 {
     cout<<"command not complete";
@@ -360,6 +411,7 @@ if(er==-1)
 }else if(stoi(ch)<0)
 {
    return stoi(ch);
+
 }
 }else{
 
@@ -369,37 +421,46 @@ while(send(con,se.c_str(),se.length(),0)==-1){
     if(er>100){cout<<"connection lost1"<<endl;
             return -1;
     }}
-  //  recany(d,data);
+
 int U=0,e=0;
 cout<<"dsd\n";
-char da[8],da1[80];
-do
-{
-  U=recv(con,da,4,0)  ;
+char da[8],da1[80]={0};
+//do
+//{
+  U=recv(con,da,7,0)  ;
   e++;
 
 
+//cout<<"||||||"<<da[0]<<"||||";
 
 
 
-}while(U==-1&&e<100);
+//}while(U==-1&&e<100);
 
 
+if(U==-1||da[0]<30)return-1;
+cout<<"tgtgrt";
+e=0;
+int m=0,l=atoi(da);
+//struct timeval timeout = {5, 0};
+//setsockopt(con, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout));
+do{
+U=recv(con,&da1[m],l-m+1,0);
+if(U!=-1)m+=U;
+e++;
+cout<<l<<"="<<U<<"=="<<l-m;
 
-if(atoi(da)<1)return -1;
+}while(U==-1&&e<100);//(U==-1||m<l)&&e<1000
+if(m<l-1)return -1;
+cout<<"LLLL";
 
-
-
-while(recv(con,da1,atoi(da),0)==-1){
-
-};
-
-cout<<">>>"<<atoi(da1)<<"<<<"<<endl;
+av=da1;
+cout<<">>>"<<av<<"<<<"<<endl;
+return 1;
 }
 
-return 1;
-  }
 
+  }
 
 
 
@@ -914,7 +975,7 @@ channels[2]["BUFFER"] = {
    {0,"data_available" },
    {1,"length_align_bytes" }
    };
-  channels[2]["DEBUG_"]=
+  channels[2]["DEBUG"]=
    {
     {0,"watermark" },
     {1,"direct_reg_access" }
@@ -1007,6 +1068,32 @@ A.intcontrol("192.168.2.1");
     recv(A.con, trash, sizeof(trash), 0);
 
 
+A.WandR("2400000000",0,1,5,1);
+A.WandR("2400000000",0,0,5,1);
+A.WandR("1000000",0,9,2,1);
+A.WandR("1000000",0,5,7,1);
+A.WandR("0x80000088 0x6",2,1,1,1);
+ A.WandR("2147483784",2,1,1,1);
+while(A.WandR("1000000",0,6,9,0)==-1);
+while(A.WandR("1000000",2,6,3,0)==-1);
+getchar();
+char str[20];
+snprintf(str, sizeof(str), "%d", A.sam_av(0));
+
+//cout<<A.av.substr(1, A.av.find(' '));
+A.WandR(str,0,6,8,1);
+while(1)A.WandR("1000000",0,6,8,1);
+//A.WandR((char *)(A.av.substr(1, A.av.find(' ')-1)+"\0\n").c_str(),0,6,8,1);
+
+
+
+A.WandR("1000000",3,2,4,1);
+
+while(A.WandR("1000000",2,6,2,0)==-1);
+while(A.WandR("1000000",2,6,3,0)==-1);
+
+getchar();
+
 A.intwrite("192.168.2.1",32000);
 
 
@@ -1017,10 +1104,11 @@ A.intread("192.168.2.1",32000);
 comp f[32000];
 unsigned char te[8001];
 
-for(int i=0;i<8001;i++)te[i]=0x02;
+for(int i=0;i<8001;i++)te[i]=rand();//0x02;
     //sine(f,32000,4,1,45*3.141/180.0);
    QPSk(f,te,32000,4);
-   char * buf=(char *)f;
+   char  *buf=(char *)f;
+   /*
    int I=0,Q=0;
    char tt[32000];
 short tt2[32000];
@@ -1034,29 +1122,40 @@ Q+=(-sin((2*3.141*i/4))*tt[i]);
 }
 
 cout<<atan2(Q,I)*(180/3.141)<<endl;
-getchar();
+getchar();*/
 //cout<<A.writebuff(recvBuffer,32000*4)<<endl;
 
-A.WandR("2400000000",0,1,5,1);
+//A.WandR("2400000000",0,1,5,1);
 //A.WandR("20000000",2,6,2,1);
 
 while(1){
-        A.writebuff(buf,32000*4);
+   // thread F(&adalm::writebuff,&A,buf,32000*4);
+   // usleep(500);
+   //
+
+    A.writebuff(buf,32000*4);
+//thread F1(&adalm::readbuff,&A,(char*)f,32000*4);
+//A.readbuff(buf,32000*4);
+
+  //F1.join();
+ // thread F2(&adalm::readbuff,&A,(char*)f,32000*4);
+//A.readbuff(buf,32000*4);
+
+ // F2.join();
+//F.join();
+//break;
+       // A.readbuff(buf,32000*4);
+      //  break;
        // usleep(30);
-A.WandR("3000000000",2,0,0,0);
+//A.WandR("3000000000",2,0,0,0);
 
 }
+comp *f1=(comp *)buf;
+for(int i=0 ;i<32000;i++)
+{
+    printf("%x   %x   ",(short)f[i].i,(short)f[i].Q);
+}
 
-for(int i ;i<32000;i++)
-{
-    printf("%x   %x   ",z[i].i,z[i].Q);
-}
-short plot[32000];
-//com2mag(32000,plot,z);
-for(int i ;i<32000;i++)
-{
-    printf("%x,  ",plot[i]);
-}
 //A.WandR("3000000000",0,0,5,1);
 //A.WandR("1000000",3,2,4,1);
 //A.WandR("k",0,2,8,1);
