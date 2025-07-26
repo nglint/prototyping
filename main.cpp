@@ -114,14 +114,14 @@ int chconn(int long long sock)
     }
     return false; // not ready, likely still open
 }
-void com2re(short *A,short *B, int len)
+void com2re(comp *A,short *B, int len)
 {
 
- for(int i=0;i<len;i+=2,B++)
- {
-  *B=A[i]  ;
+ for(int i=0;i<300;i++)B[i]=(short)(cos((2*3.141)+atan(-A[i].Q/A[i].i))*sqrt((A[i].Q*A[i].Q)+(A[i].i*A[i].i)));
+ for(int i=0,k=0;i<len;i++){if(A[i].i>0xff)k=1;
+    if(i%4==0&&k)cout<<atan2(A[i].Q,A[i].i)<<"   ";
  }
-   return;
+exit(1);
 }
 
 void short2byte(short *A,char* B,int len)
@@ -1086,7 +1086,7 @@ A.WandR("1000000",0,5,7,1);
  //A.WandR("2147483784",2,1,1,1);
 
 while(A.WandR("1000000",2,6,3,0)==-1);
-while(A.WandR("1000000",0,6,9,0)==-1);
+while(A.WandR("1000000",0,6,9,0)==-1);//read range
 A.fir(fil ,1000000,1000000);
 
 char str[20];
@@ -1094,13 +1094,13 @@ snprintf(str, sizeof(str), "%d", A.sam_av(1));
 
 //cout<<A.av.substr(1, A.av.find(' '));
 A.WandR(str,0,6,8,1);
-getchar();
-A.WandR(fil,0,2,8,1);
-getchar();
+
+A.WandR(fil,0,2,8,1);//write filter
+
 A.WandR(str,0,6,8,1);
-getchar();
-A.WandR("1",0,3,0,1);
-getchar();
+
+A.WandR("1",0,3,0,1);//en_filter
+
 A.WandR("1000000",0,6,8,1);
 //A.WandR((char *)(A.av.substr(1, A.av.find(' ')-1)+"\0\n").c_str(),0,6,8,1);
 
@@ -1114,16 +1114,16 @@ while(A.WandR("1000000",2,6,3,0)==-1);
 getchar();
 
 A.intwrite("192.168.2.1",32000);
-
-
 A.intread("192.168.2.1",32000);
+
+
 
 
 //A.WandR("3000000000",3,0,0,0);
 comp f[32000];
 unsigned char te[8001];
 
-for(int i=0;i<8001;i++)te[i]=rand();//0x02;
+for(int i=0;i<8001;i++)te[i]=rand()%255;
     //sine(f,32000,4,1,45*3.141/180.0);
    QPSk(f,te,32000,4);
    char  *buf=(char *)f;
@@ -1154,6 +1154,7 @@ while(1){
 
     A.writebuff(buf,32000*4);
 //thread F1(&adalm::readbuff,&A,(char*)f,32000*4);
+
 //A.readbuff(buf,32000*4);
 
   //F1.join();
@@ -1162,17 +1163,21 @@ while(1){
 
  // F2.join();
 //F.join();
-//break;
+//
+break;
        // A.readbuff(buf,32000*4);
       //  break;
        // usleep(30);
 //A.WandR("3000000000",2,0,0,0);
 
 }
+int k=0;
+short hh[32000];
+com2re(f,hh,32000);
 comp *f1=(comp *)buf;
 for(int i=0 ;i<32000;i++)
-{
-    printf("%x   %x   ",(short)f[i].i,(short)f[i].Q);
+{if(f[i].i>0x00)k=1;
+  if(k)  printf("%x   %x   ",f[i].i,f[i].Q);
 }
 
 //A.WandR("3000000000",0,0,5,1);
