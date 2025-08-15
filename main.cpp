@@ -8,6 +8,7 @@
 #include<unistd.h>
 #include <thread>
 #pragma comment(lib, "Ws2_32.lib")
+#define M_PI 3.14159265358979323846
 using namespace std;
 std::map<int,map<std::string, std::map<int, std::string>>> channels;
 union d0
@@ -29,12 +30,15 @@ void com2mag(int len , short * A,comp * d)
 }
 void sine(comp * A,int len,int N,int S,float th)
 {
-for(int i=0;i<len;i+=4){
+for(int i=0;i<len;i+=N){
     for(int I=0;I<N;I++)
 {
-   A[i+I].i=(short)(cos((2*3.141*I/N)+th)*32767)/S ;
-   A[i+I].Q=(short)(sin((2*3.141*I/N)+th)*32767)/S ;
-}
+  A[i+I].i=(short)(cos((2*3.141*I/N)+th)*32767)/S;
+
+  A[i+I].Q=(short)(sin((2*3.141*I/N)+th)*32767)/S ;
+//if(th!=1)cout<<(sqrt(pow(A[i+I].Q,2)+pow(A[i+I].i,2))*cos(atan2(A[i+I].Q,A[i+I].i)))<<",   ";
+//if(th!=1)cout<<A[i+I].i<<"  "<<A[i+I].Q<<"   ";
+}//if(th!=1)exit(1);
 }
     return;
 }
@@ -45,18 +49,41 @@ for(int i=0;i<len;i+=4){
 {
    A[i+I].i=(short)rand() ;
    A[i+I].Q=(short)rand() ;
+
 }
+
 }
     return;
+}
+void QPSk2(comp *Qpsk,unsigned char * data,int len ,int N)
+{float ph[4]={-2.356,-0.785,2.356,0.785};
+unsigned char a=0;
+    for(int i=0,q=0;i<len;i+=N,q++)
+   {
+        if(q%4==0&&i!=0)
+   {
+    data ++;
+
+   }
+      a=*data&3;
+
+   *data=*data>>2;
+
+   sine(&Qpsk[i],N,N,1,ph[a]-1.57);
+
+
+   }
+ return;
 }
 void QPSk(comp *Qpsk,unsigned char * data,int len ,int N)
 {comp I[len],Q[len];
  sine(I,len, N,2,0) ;
  sine(Q,len, N,2,(90*3.141)/180) ;
+
  char a,b;
-   for(int i=0,q=0;i<len;i+=4,q++)
+   for(int i=0,q=0;i<len;i+=N,q++)
    {
-        if(q%4==0)
+        if(q%4==0&&i!=0)
    {
     data ++;
 
@@ -73,6 +100,8 @@ void QPSk(comp *Qpsk,unsigned char * data,int len ,int N)
        {
         Qpsk[i+ii].i=(I[i+ii].i*a)+(Q[i+ii].i*b);
         Qpsk[i+ii].Q=(I[i+ii].Q*a)+(Q[i+ii].Q*b);
+//cout<<(sqrt(pow(Qpsk[i+ii].Q,2)+pow(Qpsk[i+ii].i,2))*cos(atan2(Qpsk[i+ii].Q,Qpsk[i+ii].i)))<<",   ";
+
        }
    }
  return;
@@ -84,44 +113,99 @@ int che(char *A)
 
 }
 
-int chconn(int long long sock)
-{
-    fd_set readfds;
-    FD_ZERO(&readfds);
-    FD_SET(sock, &readfds);
-
-    TIMEVAL timeout;
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 0; // non-blocking
-
-    int sel = select(0, &readfds, NULL, NULL, &timeout);
-    if (sel > 0 && FD_ISSET(sock, &readfds)) {
-        // Now it's safe to peek
-        char buffer;
-        int result = recv(sock, &buffer, 1, MSG_PEEK);
-        if (result == 0) {
-            return true; // socket closed by peer
-        } else if (result == SOCKET_ERROR) {
-            int err = WSAGetLastError();
-            if (err == WSAEWOULDBLOCK) {
-                return false; // no data, but socket still open
-            }
-            std::cerr << "recv error: " << err << std::endl;
-            return true; // error = likely closed
-        } else {
-            return false; // data available, socket open
-        }
+double an_difference(double theta1, double theta2) {
+    double diff = fabs(theta1 - theta2);  // Absolute raw difference
+    diff = fmod(diff, 2.0 * M_PI);       // Wrap to [0, 2π)
+    if (diff > M_PI) {
+        diff = 2.0 * M_PI - diff;        // Reflect to get smallest angle
     }
-    return false; // not ready, likely still open
+    return diff;  // Range: [0, π]
+}
+
+float demod(short *A ,int N)
+{
+   float I[N],Q[N];
+   for(int i=0;i<N;i++)
+   {I[i]=cos(M_PI*2*((float)i/N));
+    Q[i]=sin(M_PI*2*((float)i/N));
+   }
+   float a=0,b=0;
+   for(int i=0;i<N;i++)
+   {
+       a+=(float)I[i]*A[i];
+       b+=(float)Q[i]*A[i];
+
+   }
+   return atan2(-b,a);
+}
+
+
+
+
+float er(float a)
+{float g[4]={0.785,-2.356,-0.785,2.356};
+    float t=30;
+
+    for(int i=0;i<2;i++)
+    {
+       if(t> an_difference(g[i],a)) t=an_difference(g[i],a);
+    }
+    return t;
 }
 void com2re(comp *A,short *B, int len)
 {
-
- for(int i=0;i<300;i++)B[i]=(short)(cos((2*3.141)+atan(-A[i].Q/A[i].i))*sqrt((A[i].Q*A[i].Q)+(A[i].i*A[i].i)));
- for(int i=0,k=0;i<len;i++){if(A[i].i>0xff)k=1;
-    if(i%4==0&&k)cout<<atan2(A[i].Q,A[i].i)<<"   ";
+float I[8]={1,0.707,0,-0.707,-1,-0.707,0,0.707,},Q[8]={0,0.707,1,0.707,0,-0.707,-1,-0.707},t=0,z=5000;
+ for(int i=0,k=0,g=0;i<len;i++){if(sqrt(pow(A[i].i,2)+pow(A[i].Q,2))>0xff&&k==0)
+ {k=1;
+;
  }
+       if(k) B[g]=(short)(cos(atan2(A[i].Q,A[i].i))*sqrt(pow(A[i].i,2)+pow(A[i].Q,2))),g++;
+}/*
+for(int i=0,k=0,g=0;i<len;i++){if(sqrt(pow(A[i].i,2)+pow(A[i].Q,2))>0xff&&k==0){
+        k=1;
+int m=0;
+for(int ii=i+10;ii<i+100;ii++){float b=angular_difference(atan2(-A[ii].Q,A[ii].i),atan2(-A[ii+1].Q,A[ii+1].i));
+       if( t<b)t=b,m=ii;
+
+};
+i=m+1;
+
+}
+    if(g%8==0&&k)cout<<atan2(A[i].Q,A[i].i)<<"   ";
+
+    if(k)g++;
+ }*/
+
+ int m=0;
+
+for(int i=0;i<8;i++)
+{
+t=0;
+
+for(int ii=i;ii<(i+(8*8));ii+=8)
+    {
+t+=er(demod(&B[ii],8));
+//cout<<demod(&B[ii],8)*(180/M_PI)<<"   ";
+  }
+t/=8;
+cout<<t<<endl<<endl;
+if(z>t)z=t,m=i;
+}//for(;m>8;m-=8);
+
+cout<<">>>"<<m<<":"<<demod(&B[m],8)<<endl;
+
+
+
+for(int i=m;i<m+8000;i+=8)
+{//i-=(int)(er(demod(&B[i],8))/1.57)*4;
+cout<<demod(&B[i],8)*(180/M_PI)<<"   ";
+}
+
 exit(1);
+/*for(int i=0,k=0;i<len;i++){if(A[i].i>0xff)k=1;
+    if(i%4==0&&k)cout<<atan2(A[i].Q,A[i].i)<<"   ";
+ }*/
+
 }
 
 void short2byte(short *A,char* B,int len)
@@ -145,7 +229,7 @@ class adalm
   t[0][0]="OUTPUT", t[0][1]="OUTPUT", t[0][2]="DEBUG", t[0][3]="INPUT" , t[0][4]="INPUT", t[0][5]="INPUT", t[0][6]="OUTPUT", t[0][7]="INPUT", t[0][8]="OUTPUT", t[0][9]="OUTPUT";
    t[1][0]="INPUT", t[1][1]="INPUT", t[1][2]="INPUT", t[1][3]="INPUT", t[1][4]="INPUT", t[1][5]="INPUT", t[1][6]="INPUT", t[1][7]="INPUT", t[1][8]="INPUT", t[1][9]="" ;
   t[2][0]="", t[2][1]="DEBUG", t[2][2]="OUTPUT", t[2][3]="OUTPUT", t[2][4]="", t[2][5]="DEBUG", t[2][4]="OUTPUT", t[2][5]="OUTPUT",t[2][6]="OUTPUT";;
-   t[3][2]="", t[3][3]="DEBUG",t[3][2]="INPUT", t[3][3]="INPUT";
+   t[3][2]="", t[3][1]="DEBUG",t[3][2]="INPUT", t[3][3]="INPUT";
   }
 string av="";
 intcontrol(char *ip)
@@ -319,7 +403,7 @@ int sam_av(int ud)
 }
 int fir(char *a,int bw,int sample)
 {
-  if(bw==20000000&&sample==1000000) strcpy(a,"RX 3 GAIN -6 DEC 4\nTX 3 GAIN 0 INT 4\n-15,-15\n-27,-27\n-23,-23\n-6,-6\n17,17\n33,33\n31,31\n9,9\n-23,-23\n-47,-47\n-45,-45\n-13,-13\n34,34\n69,69\n67,67\n21,21\n-49,-49\n-102,-102\n-99,-99\n-32,-32\n69,69\n146,146\n143,143\n48,48\n-96,-96\n-204,-204\n-200,-200\n-69,-69\n129,129\n278,278\n275,275\n97,97\n-170,-170\n-372,-372\n-371,-371\n-135,-135\n222,222\n494,494\n497,497\n187,187\n-288,-288\n-654,-654\n-665,-665\n-258,-258\n376,376\n875,875\n902,902\n363,363\n-500,-500\n-1201,-1201\n-1265,-1265\n-530,-530\n699,699\n1748,1748\n1906,1906\n845,845\n-1089,-1089\n-2922,-2922\n-3424,-3424\n-1697,-1697\n2326,2326\n7714,7714\n12821,12821\n15921,15921\n15921,15921\n12821,12821\n7714,7714\n2326,2326\n-1697,-1697\n-3424,-3424\n-2922,-2922\n-1089,-1089\n845,845\n1906,1906\n1748,1748\n699,699\n-530,-530\n-1265,-1265\n-1201,-1201\n-500,-500\n363,363\n902,902\n875,875\n376,376\n-258,-258\n-665,-665\n-654,-654\n-288,-288\n187,187\n497,497\n494,494\n222,222\n-135,-135\n-371,-371\n-372,-372\n-170,-170\n97,97\n275,275\n278,278\n129,129\n-69,-69\n-200,-200\n-204,-204\n-96,-96\n48,48\n143,143\n146,146\n69,69\n-32,-32\n-99,-99\n-102,-102\n-49,-49\n21,21\n67,67\n69,69\n34,34\n-13,-13\n-45,-45\n-47,-47\n-23,-23\n9,9\n31,31\n33,33\n17,17\n-6,-6\n-23,-23\n-27,-27\n-15,-15\n\n");
+  if(bw==20000000&&sample==1000000) strcpy(a,"RX 3 GAIN -6 DEC 1\nTX 3 GAIN 0 INT 4\n-15,-15\n-27,-27\n-23,-23\n-6,-6\n17,17\n33,33\n31,31\n9,9\n-23,-23\n-47,-47\n-45,-45\n-13,-13\n34,34\n69,69\n67,67\n21,21\n-49,-49\n-102,-102\n-99,-99\n-32,-32\n69,69\n146,146\n143,143\n48,48\n-96,-96\n-204,-204\n-200,-200\n-69,-69\n129,129\n278,278\n275,275\n97,97\n-170,-170\n-372,-372\n-371,-371\n-135,-135\n222,222\n494,494\n497,497\n187,187\n-288,-288\n-654,-654\n-665,-665\n-258,-258\n376,376\n875,875\n902,902\n363,363\n-500,-500\n-1201,-1201\n-1265,-1265\n-530,-530\n699,699\n1748,1748\n1906,1906\n845,845\n-1089,-1089\n-2922,-2922\n-3424,-3424\n-1697,-1697\n2326,2326\n7714,7714\n12821,12821\n15921,15921\n15921,15921\n12821,12821\n7714,7714\n2326,2326\n-1697,-1697\n-3424,-3424\n-2922,-2922\n-1089,-1089\n845,845\n1906,1906\n1748,1748\n699,699\n-530,-530\n-1265,-1265\n-1201,-1201\n-500,-500\n363,363\n902,902\n875,875\n376,376\n-258,-258\n-665,-665\n-654,-654\n-288,-288\n187,187\n497,497\n494,494\n222,222\n-135,-135\n-371,-371\n-372,-372\n-170,-170\n97,97\n275,275\n278,278\n129,129\n-69,-69\n-200,-200\n-204,-204\n-96,-96\n48,48\n143,143\n146,146\n69,69\n-32,-32\n-99,-99\n-102,-102\n-49,-49\n21,21\n67,67\n69,69\n34,34\n-13,-13\n-45,-45\n-47,-47\n-23,-23\n9,9\n31,31\n33,33\n17,17\n-6,-6\n-23,-23\n-27,-27\n-15,-15\n\n");
 else if(bw==1000000&&sample==1000000)strcpy(a,"RX 3 GAIN -6 DEC 4\nTX 3 GAIN 0 INT 4\n-15,-15\n-27,-27\n-23,-23\n-6,-6\n17,17\n33,33\n31,31\n9,9\n-23,-23\n-47,-47\n-45,-45\n-13,-13\n34,34\n69,69\n67,67\n21,21\n-49,-49\n-102,-102\n-99,-99\n-32,-32\n69,69\n146,146\n143,143\n48,48\n-96,-96\n-204,-204\n-200,-200\n-69,-69\n129,129\n278,278\n275,275\n97,97\n-170,-170\n-372,-372\n-371,-371\n-135,-135\n222,222\n494,494\n497,497\n187,187\n-288,-288\n-654,-654\n-665,-665\n-258,-258\n376,376\n875,875\n902,902\n363,363\n-500,-500\n-1201,-1201\n-1265,-1265\n-530,-530\n699,699\n1748,1748\n1906,1906\n845,845\n-1089,-1089\n-2922,-2922\n-3424,-3424\n-1697,-1697\n2326,2326\n7714,7714\n12821,12821\n15921,15921\n15921,15921\n12821,12821\n7714,7714\n2326,2326\n-1697,-1697\n-3424,-3424\n-2922,-2922\n-1089,-1089\n845,845\n1906,1906\n1748,1748\n699,699\n-530,-530\n-1265,-1265\n-1201,-1201\n-500,-500\n363,363\n902,902\n875,875\n376,376\n-258,-258\n-665,-665\n-654,-654\n-288,-288\n187,187\n497,497\n494,494\n222,222\n-135,-135\n-371,-371\n-372,-372\n-170,-170\n97,97\n275,275\n278,278\n129,129\n-69,-69\n-200,-200\n-204,-204\n-96,-96\n48,48\n143,143\n146,146\n69,69\n-32,-32\n-99,-99\n-102,-102\n-49,-49\n21,21\n67,67\n69,69\n34,34\n-13,-13\n-45,-45\n-47,-47\n-23,-23\n9,9\n31,31\n33,33\n17,17\n-6,-6\n-23,-23\n-27,-27\n-15,-15\n\n");
     else return -1;
 
@@ -344,11 +428,11 @@ if(send(con,data,strlen(data),0)==-1)return -1;
 if(recv(con,fil,6,0)==-1)return -1;
 return 1;
 }
-else if(((de==1&&ch==9))||(de==2&&(ch==0||ch==4||ch==5))||(de==3&&(ch==0||ch==1)))ch*=-1;
+else if((de==1&&ch==9)||(de==2&&(ch==0||ch==4||ch==5))||(de==3&&(ch==1)))ch*=-1;
 if(ch>-1)
 {int i=0;
 
-
+cout<<t[3][1]<<"<<<";
 
         for (const auto& channel : channels[de]) {
 
@@ -380,6 +464,7 @@ else
 
                /* if(channel.first=="debug")se+="DEBUG ";
                 else if(channel.first=="buff")return -1;*/
+                    se+=" DEBUG ";
                 se+=channels[de][channel.first][art]+' ';
 
         break;}
@@ -1080,10 +1165,9 @@ A.intcontrol("192.168.2.1");
 char fil[2000];
 A.WandR("2400000000",0,1,5,1);
 A.WandR("2400000000",0,0,5,1);
-A.WandR("1000000",0,9,2,1);
-A.WandR("1000000",0,5,7,1);
-//A.WandR("0x80000088 0x6",2,1,1,1);
- //A.WandR("2147483784",2,1,1,1);
+A.WandR("100000",0,9,2,1);
+A.WandR("100000",0,5,7,1);
+
 
 while(A.WandR("1000000",2,6,3,0)==-1);
 while(A.WandR("1000000",0,6,9,0)==-1);//read range
@@ -1093,11 +1177,12 @@ char str[20];
 snprintf(str, sizeof(str), "%d", A.sam_av(1));
 
 //cout<<A.av.substr(1, A.av.find(' '));
+A.WandR("0",0,3,0,1);
 A.WandR(str,0,6,8,1);
 
 A.WandR(fil,0,2,8,1);//write filter
 
-A.WandR(str,0,6,8,1);
+//A.WandR(str,0,6,8,1);
 
 A.WandR("1",0,3,0,1);//en_filter
 
@@ -1110,11 +1195,15 @@ A.WandR("1000000",3,2,4,1);
 getchar();
 while(A.WandR("1000000",2,6,2,0)==-1);
 while(A.WandR("1000000",2,6,3,0)==-1);
-
+A.WandR("manual",0,5,2,1);
+A.WandR("70",0,5,4,1);
+A.WandR("1",0,5,6,1);
+A.WandR("1",0,5,0,1);
+//A.WandR("1",0,5,0,1);
 getchar();
 
 A.intwrite("192.168.2.1",32000);
-A.intread("192.168.2.1",32000);
+
 
 
 
@@ -1122,11 +1211,20 @@ A.intread("192.168.2.1",32000);
 //A.WandR("3000000000",3,0,0,0);
 comp f[32000];
 unsigned char te[8001];
+te[0]=0x33;
+te[1]=0x33;
+te[2]=0x33;
+for(int i=3;i<8001;i++){
+         te[i]=0xcc;
 
-for(int i=0;i<8001;i++)te[i]=rand()%255;
+}
     //sine(f,32000,4,1,45*3.141/180.0);
-   QPSk(f,te,32000,4);
+   QPSk2(&f[0],te,32000,8);
+  // f[0].i=0x7f,f[0].Q=0x7f;
    char  *buf=(char *)f;
+   A.intread("192.168.2.1",32000);
+A.WandR("0x80000088 0x6",3,1,1,1);
+A.WandR("2147483784",3,1,1,1);
    /*
    int I=0,Q=0;
    char tt[32000];
@@ -1147,44 +1245,53 @@ getchar();*/
 //A.WandR("2400000000",0,1,5,1);
 //A.WandR("20000000",2,6,2,1);
 
-while(1){
+
+comp f1[32000];
+char * buf2=(char *)f1;
+int u=0;
+A.readbuff(buf2,32000*4);A.readbuff(buf2,32000*4);A.readbuff(buf2,32000*4);A.readbuff(buf2,32000*4);
+while(u<1){
+
    // thread F(&adalm::writebuff,&A,buf,32000*4);
    // usleep(500);
    //
 
-    A.writebuff(buf,32000*4);
+   A.writebuff(buf,32000*4);
+
 //thread F1(&adalm::readbuff,&A,(char*)f,32000*4);
-
+//cout<<"dd";
 //A.readbuff(buf,32000*4);
-
+//cout<<"wdw";
   //F1.join();
  // thread F2(&adalm::readbuff,&A,(char*)f,32000*4);
-//A.readbuff(buf,32000*4);
+
+A.readbuff(buf2,32000*4);
 
  // F2.join();
 //F.join();
 //
-break;
+
        // A.readbuff(buf,32000*4);
-      //  break;
+u++;
        // usleep(30);
 //A.WandR("3000000000",2,0,0,0);
 
 }
 int k=0;
 short hh[32000];
-com2re(f,hh,32000);
-comp *f1=(comp *)buf;
+com2re(f1,hh,32000);
+//for(int i=0;i<32000*4;i++2)printf("%x%x    ",buf2[i],buf2[i+1]);
+//exit(1);
 for(int i=0 ;i<32000;i++)
-{if(f[i].i>0x00)k=1;
-  if(k)  printf("%x   %x   ",f[i].i,f[i].Q);
+{if(sqrt(pow(f1[i].i,2)+pow(f1[i].Q,2))>0xff&&k==0)k=1;
+  if(1)  printf("%x   %x   ",f1[i].i,f1[i].Q);
 }
 
 //A.WandR("3000000000",0,0,5,1);
 //A.WandR("1000000",3,2,4,1);
 //A.WandR("k",0,2,8,1);
 //A.WandR("1",0,3,0,1);
-//A.WandR("slow_attack",0,5,2,1);
+//
 //A.WandR(dd,0,0,8,0);
 
 
