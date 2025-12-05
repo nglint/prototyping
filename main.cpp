@@ -6,7 +6,9 @@
 #include <math.h>
 #include <string>
 #include<unistd.h>
+#include <zlib.h>
 #include <thread>
+#include <chrono>
 #pragma comment(lib, "Ws2_32.lib")
 #define M_PI 3.14159265358979323846
 using namespace std;
@@ -33,9 +35,10 @@ void sine(comp * A,int len,int N,int S,float th)
 for(int i=0;i<len;i+=N){
     for(int I=0;I<N;I++)
 {
-  A[i+I].i=(short)(cos((2*3.141*I/N)+th)*32767)/S;
+  A[i+I].i=(short)(cos((2*M_PI*I/N)+th)*4096)/S;
 
-  A[i+I].Q=(short)(sin((2*3.141*I/N)+th)*32767)/S ;
+  A[i+I].Q=(short)(sin((2*M_PI*I/N)+th)*4096)/S ;
+   //printf("(0x%02X,0x%02X),  ",(int)(uint16_t) A[i+I].i,(int)(uint16_t) A[i+I].Q);
 //if(th!=1)cout<<(sqrt(pow(A[i+I].Q,2)+pow(A[i+I].i,2))*cos(atan2(A[i+I].Q,A[i+I].i)))<<",   ";
 //if(th!=1)cout<<A[i+I].i<<"  "<<A[i+I].Q<<"   ";
 }//if(th!=1)exit(1);
@@ -55,26 +58,29 @@ for(int i=0;i<len;i+=4){
 }
     return;
 }
+
 void QPSk2(comp *Qpsk,unsigned char * data,int len ,int N)
 {float ph[4]={-2.356,-0.785,2.356,0.785};
 unsigned char a=0;
-    for(int i=0,q=0;i<len;i+=N,q++)
+    for(int i=0,q=q%4,m=0;i<len;i+=N,q++,m=q%4)
    {
         if(q%4==0&&i!=0)
    {
     data ++;
 
    }
-      a=*data&3;
+      a=(*data>>(m*2))&3;
 
-   *data=*data>>2;
+  // *data=*data>>2;
 
-   sine(&Qpsk[i],N,N,1,ph[a]-1.57);
+   sine(&Qpsk[i],N,N,1,ph[a]);
 
 
    }
  return;
 }
+
+
 void QPSk(comp *Qpsk,unsigned char * data,int len ,int N)
 {comp I[len],Q[len];
  sine(I,len, N,2,0) ;
@@ -106,23 +112,149 @@ void QPSk(comp *Qpsk,unsigned char * data,int len ,int N)
    }
  return;
 }
+
 int che(char *A)
 {
   if(A[0]<30) return 0 ;
   return 1;
 
 }
-
-double an_difference(double theta1, double theta2) {
-    double diff = fabs(theta1 - theta2);  // Absolute raw difference
-    diff = fmod(diff, 2.0 * M_PI);       // Wrap to [0, 2π)
-    if (diff > M_PI) {
-        diff = 2.0 * M_PI - diff;        // Reflect to get smallest angle
+double normalize_angle(double theta) {
+    theta = fmod(theta + M_PI, 2 * M_PI);
+    if (theta < 0) {
+        theta += 2 * M_PI;
     }
-    return diff;  // Range: [0, π]
+    return theta - M_PI;
 }
 
-float demod(short *A ,int N)
+int S_comp(char *A, char *B, int len ,int N)
+{char en[len];
+unsigned char s=0,ch=0;
+int comp =0,d=0,g=0,ra=0;
+std::fill(en, en+len, 1);
+
+   for(int i=0; i<=len ;i+=N)
+   {int f=1;
+
+   g=(N*255);//128 blocks *N
+   bbb:
+if(len-i<=(255*N))ch=1,g=len-i;// max len limit check
+
+      if(en[i]==0){i+=N;// already compresed skip
+      goto bbb;
+      }
+unsigned char cc=1;
+    for(int c=N;c<g&&f==1;c+=N,cc++)//cc is block ID
+    {//cout<<cc<<"   ";
+
+       // if (i + c + N > len) break;
+       if(abs(A[i]-A[i+c])<=2&&en[i+c]==1)
+
+            {//cout<<(int)A[i]<<"=="<<(int)A[i+c]<<endl;
+                int t=1;
+               // cout<<"1:"<<i<<endl;
+
+
+
+       for(int h=1;h<N;h++)
+       {//cout<<(int)A[i+h]<<"=="<<(int)A[i+c+h]<<endl;
+           if(abs(A[i+h]-A[i+c+h])>2)
+           {
+               t=7;
+               break;
+           }
+         //  if(i>1007&&cout<<(int)A[i+h]<<"=="<<(int)A[i+c+h]<<endl;
+       }
+       //cout<<endl;
+         if(t<2)   {comp++;
+                en[i+c]=0;
+ra++;
+
+ //asm("shl %1,%0" : "+r"(cc) : "cI"((unsigned char)1));
+s=cc;
+
+//cout<<endl<<(s>>1)<<endl;
+            f=0;
+
+         }
+       }
+
+    }
+
+B[d]=s;
+for(int I=0;I<N;I++){
+    B[d+1+I]=A[i+I];//putting the block in the new array
+
+     // asm("shr %1,%0" : "+r"(s) : "cI"((unsigned char)1));
+
+//if(s&1)cout<<(int)A[i+I]<<"=="<<(int)A[i+I+(N*(s>>1))]<<"||"<<(s>>1)<<"++"<<(B[d]>>1)<<endl;
+}
+    d+=(N+1);
+
+
+
+
+s=0;
+ra=i;
+   }cout<<endl<<ra<<"=="<<len<<endl;
+//cout<<(float)(ra*N)/len;
+d-=N+1;
+return d;
+}
+
+int S_decomp(unsigned char *A,unsigned  char *B, int len ,int N)
+{char en[len*2];
+int ii=0,ra=0;
+std::fill(en, en+(len*2), 1);
+
+for(int i=0;i<len;i+=N+1,ii+=N)
+{//cout<<i<<"  ";
+    fff:
+  if(en[ii]==0){
+
+    ii+=N;
+    goto fff;
+  }
+      for(int c=0;c<N;c++)
+      {
+       B[ii+c]=A[i+c+1]  ;
+      }
+
+      if(A[i]!=0)
+      {unsigned char a=A[i];
+     // asm("shr %1,%0" : "+r"(a) : "cI"((unsigned char)1));
+ra++;
+en[ii+(a*N)]=0;
+//cout<<(A[i]>>1)<<"   ";
+         for(int c=0;c<N;c++)
+      {
+       B[ii+c+(a*N)]=A[i+c+1]  ;
+      }
+
+      }
+
+}
+cout<<endl<<ra<<endl;
+return ii;
+}
+double add_angles(double a, double b) {
+    return normalize_angle(a + b);
+}
+
+
+double subtract_angles(double a, double b) {
+    return normalize_angle(a - b);
+}
+
+double an_difference(double theta1, double theta2) {
+    double diff = fabs(theta1 - theta2);
+    diff = fmod(diff, 2.0 * M_PI);
+    if (diff > M_PI) {
+        diff = 2.0 * M_PI - diff;
+    }
+    return diff;
+}
+template <typename t> float demod(t *A ,int N)
 {
    float I[N],Q[N];
    for(int i=0;i<N;i++)
@@ -138,44 +270,91 @@ float demod(short *A ,int N)
    }
    return atan2(-b,a);
 }
+char deQPSK(char *A ,int N, float th )
+{
+   float I[N],Q[N];
+   for(int i=0;i<N;i++)
+   {I[i]=cos(M_PI*2*((float)i/N)-th);
+    Q[i]=-sin(M_PI*2*((float)i/N)-th);
+   }
+   float a=0,b=0;
+   for(int i=0;i<N;i++)
+   {
+       a+=(float)I[i]*A[i];
+       b+=(float)Q[i]*A[i];
+
+   }
 
 
+    unsigned char c=0;
+    if(a>0)c|=1;
+    if(b>0)c|=2;
+//cout<<a<<"_"<<b<<",    ";
+    return c;
 
+}
+
+int sy2by(char *A,unsigned char *B,int N,float th,int len)
+{int i=0;
+
+ for(int I=0;I<len;i++)
+   {B[i]=0;
+     for(int ii=0;ii<8;ii+=2,I+=N)
+       {
+        B[i]|= (deQPSK(&A[I],N,th)<<ii);
+       }
+   }
+ return i;
+
+}
+
+
+void short2byte(short *A, char* B,int len)
+{
+  float c=0;
+  for(int i=0;i<len;i++)
+  {
+    c= ((( float)A[i]/(2048))*127) ;
+
+   B[i]=(signed char)c;
+
+   //cout<<(int)B[i]<<endl;
+  }
+
+  return;
+}
 
 float er(float a)
 {float g[4]={0.785,-2.356,-0.785,2.356};
     float t=30;
 
-    for(int i=0;i<2;i++)
+    for(int i=0;i<4;i++)
     {
        if(t> an_difference(g[i],a)) t=an_difference(g[i],a);
     }
     return t;
 }
-void com2re(comp *A,short *B, int len)
+int com2re(comp *A,short *B, int len)
 {
-float I[8]={1,0.707,0,-0.707,-1,-0.707,0,0.707,},Q[8]={0,0.707,1,0.707,0,-0.707,-1,-0.707},t=0,z=5000;
- for(int i=0,k=0,g=0;i<len;i++){if(sqrt(pow(A[i].i,2)+pow(A[i].Q,2))>0xff&&k==0)
+//float I[8]={1,0.707,0,-0.707,-1,-0.707,0,0.707,},Q[8]={0,0.707,1,0.707,0,-0.707,-1,-0.707},t=0,z=5000;
+ char B1[len]={0};
+
+int g=0;
+ for(int i=0,k=0;i<len;i++){
+//cout<<A[i].i<<"="<<A[i].Q<<endl;
+        if(sqrt(pow(A[i].i,2)+pow(A[i].Q,2))>0x1A&&k==0)
  {k=1;
-;
+
  }
-       if(k) B[g]=(short)(cos(atan2(A[i].Q,A[i].i))*sqrt(pow(A[i].i,2)+pow(A[i].Q,2))),g++;
-}/*
-for(int i=0,k=0,g=0;i<len;i++){if(sqrt(pow(A[i].i,2)+pow(A[i].Q,2))>0xff&&k==0){
-        k=1;
-int m=0;
-for(int ii=i+10;ii<i+100;ii++){float b=angular_difference(atan2(-A[ii].Q,A[ii].i),atan2(-A[ii+1].Q,A[ii+1].i));
-       if( t<b)t=b,m=ii;
-
-};
-i=m+1;
-
+ //cout<<sqrt(pow(A[i].i,2)+pow(A[i].Q,2))*cos(2*M_PI+atan2(A[i].Q,A[i].i))<<",   ";
+ //cout<<A[i].i<<",   ";
+       if(k) B[g]=(short)A[i].i,g++;
 }
-    if(g%8==0&&k)cout<<atan2(A[i].Q,A[i].i)<<"   ";
 
-    if(k)g++;
- }*/
+return g;
 
+
+/*short2byte(&B[0],&B1[0],len);
  int m=0;
 
 for(int i=0;i<8;i++)
@@ -184,40 +363,82 @@ t=0;
 
 for(int ii=i;ii<(i+(8*8));ii+=8)
     {
-t+=er(demod(&B[ii],8));
-//cout<<demod(&B[ii],8)*(180/M_PI)<<"   ";
+t+=er(demod< char>(&B1[ii],8));
+cout<<demod(&B[ii],8)*(180/M_PI)<<"   ";
   }
 t/=8;
 cout<<t<<endl<<endl;
 if(z>t)z=t,m=i;
 }//for(;m>8;m-=8);
 
-cout<<">>>"<<m<<":"<<demod(&B[m],8)<<endl;
+cout<<">>>"<<m<<":"<<demod< char>(&B1[m],8)<<endl;
 
 
 
 for(int i=m;i<m+8000;i+=8)
 {//i-=(int)(er(demod(&B[i],8))/1.57)*4;
-cout<<demod(&B[i],8)*(180/M_PI)<<"   ";
+cout<<demod< char>(&B1[i],8)*(180/M_PI)<<"   ";
 }
 
-exit(1);
+
 /*for(int i=0,k=0;i<len;i++){if(A[i].i>0xff)k=1;
     if(i%4==0&&k)cout<<atan2(A[i].Q,A[i].i)<<"   ";
  }*/
 
 }
-
-void short2byte(short *A,char* B,int len)
+int com2reT(comp *A,short *B, int len)
 {
-  float c=0;
-  for(int i=0;i<len;i++,B++)
-  {
-    c= ((float)A[i]/32768)*128 ;
-    *B=(char)c;
-  }
-  return;
+
+int g=0;
+ for(int i=0,k=0;i<len;i++)
+    {
+       B[g]=(short)A[i].i,g++;
 }
+
+return g;
+}
+
+float cal(char *B1,int N,float ph)
+{
+   return atan2f(sinf(ph - demod<char>(&B1[0],N)), cosf(ph - demod<char>(&B1[0],N)));
+}
+
+float ana(char * B1,int l,float g)
+{
+float th=g;
+if(g==0)th=atan2f(sinf(0.785 - demod<char>(&B1[0],8)), cosf(0.785 - demod<char>(&B1[0],8)));
+//if(demod<char>(&B1[0],8)<0.785)th=-th;
+int m=0;
+cout<<demod<char>(&B1[0],8)*(180/M_PI)<<endl;
+float t=0,z=5000;
+for(int i=0;i<8;i++)
+{
+t=0;
+
+for(int ii=i;ii<(i+(8*8));ii+=8)
+    {
+t+=er(subtract_angles((demod<char>(&B1[ii],8)),-th));
+cout<<(demod(&B1[ii],8))*(180/M_PI)<<"   ";
+  }
+t/=8;
+cout<<t<<endl<<endl;
+if(z>t)z=t,m=i;
+}
+
+cout<<">>>"<<m<<":"<<demod< char>(&B1[m],8)<<endl;
+//m=0;
+
+  cout<<th*(180/M_PI)<<endl;
+for(int i=m;i<l/8;i+=8)
+{//i-=(int)(er(demod(&B[i],8))/1.57)*4;
+
+cout<<subtract_angles((demod<char>(&B1[i],8)),-th)*(180/M_PI)<<"   ";
+//cout<<demod<char>(&B1[i],8)*(180/M_PI)<<"   ";
+}
+
+return th;
+}
+
 
 class adalm
 {public:
@@ -266,7 +487,8 @@ intcontrol(char *ip)
   {wr = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 string da="OPEN iio:device2 ";
 da=da+std::to_string(buff);
-da=da+" 00000003\r\n";
+da=da+" 00000003 CYCLIC\r\n";
+//00000003 CYCLIC
     if (wr == INVALID_SOCKET) {
         printf("Socket creation failed: %d\n", WSAGetLastError());
 
@@ -343,7 +565,7 @@ da=da+" 00000003\r\n";
     recv(wr, recvBuffer,2, 0);
 
   do{
-    g= send(wr, recvBuffer, bufsize, 0);
+    g= send(wr, &recvBuffer[m], bufsize-m, 0);
     if(g>0)m+=g;
     e++;
     if(e>10000)return -1;
@@ -391,15 +613,19 @@ da=da+" 00000003\r\n";
  }
 int sam_av(int ud)
 {
-    char C[100];
+
+  return atoi(av.substr(0, av.find(' ')).c_str());
+
+
+  /*  char C[100];
     int d =av.find(' ');
-    int b= av.find(' ',d+1);
+   int b= av.find(' ',d+1);
    if(ud) atoi(  av.substr(1, d-1).c_str());
 
    else{
     return atoi(av.substr(b,(av.length()-b)-1).c_str());
    }
-
+*/
 }
 int fir(char *a,int bw,int sample)
 {
@@ -411,7 +637,17 @@ return 1;
 }
 
 
+int path(int o)
+{char * a="READ iio:device0 rx_path_rates\r\n",*b ="READ iio:device0 tx_path_rates\r\n";
+char c[1000];
 
+    if(o)send(con,a,strlen(a),0);
+    else send(con,a,strlen(b),0);
+    recv(con,c, 3, 0);
+    recv(con,c, stoi(c), 0);
+    cout<<c<<endl;
+    return 0;
+}
 
   int WandR(char* data,char de,char ch,unsigned char art,bool w)
   {
@@ -423,6 +659,8 @@ se=se+mp[de]+' ';
 if((de==0&&ch==2))
 {char fil[2048];
  strcpy(fil,"WRITE iio:device0 filter_fir_config 1142\r\n");
+ cout<<fil<<endl;
+ cout<<data<<endl;
 if(send(con,fil,strlen(fil),0)==-1)return -1;
 if(send(con,data,strlen(data),0)==-1)return -1;
 if(recv(con,fil,6,0)==-1)return -1;
@@ -494,7 +732,7 @@ char ch[5];
 
 GGG:
 er=recv(con,ch,10,0);
-cout<<che(ch)<<endl;
+cout<<">>>>>>>>>"<<ch<<endl;
 if(!che(ch)&&er!=-1) goto GGG;
 
 //ch[abs(er)]='\0';
@@ -1112,8 +1350,6 @@ cout<<s.first<<'-'<<s.second<<endl;
 }*/}
 int main() {
 
-
-
 adalm A;
     start();
     WSADATA wsaData;
@@ -1163,69 +1399,114 @@ A.intcontrol("192.168.2.1");
     recv(A.con, trash, sizeof(trash), 0);
 
 char fil[2000];
-A.WandR("2400000000",0,1,5,1);
-A.WandR("2400000000",0,0,5,1);
-A.WandR("100000",0,9,2,1);
-A.WandR("100000",0,5,7,1);
+A.path(1);
 
 
-while(A.WandR("1000000",2,6,3,0)==-1);
-while(A.WandR("1000000",0,6,9,0)==-1);//read range
-A.fir(fil ,1000000,1000000);
+A.WandR("3400000000",0,1,5,1);
+A.WandR("3400000000",0,0,5,1);
+//A.WandR("100000",0,9,2,1);
+//A.WandR("100000",0,5,7,1);
+
+//while(A.WandR("1000000",2,6,3,0)==-1);
+//while(A.WandR("1000000",0,6,9,0)==-1);//read range
+while(A.WandR("1000000",3,2,5,0)==-1);
+cout<<A.av.substr(1, A.av.find(' '));
 
 char str[20];
 snprintf(str, sizeof(str), "%d", A.sam_av(1));
+cout<<str<<endl;
+//A.WandR(str,0,6,8,1);
+//
+A.WandR(str,3,2,4,1);
 
-//cout<<A.av.substr(1, A.av.find(' '));
+//A.WandR("0",0,3,0,0);
+
+if(A.av=="1"){ A.WandR("3000000",0,6,8,1);
 A.WandR("0",0,3,0,1);
-A.WandR(str,0,6,8,1);
+}
+A.fir(fil ,1000000,1000000);
+A.WandR(fil,0,2,8,1);
 
-A.WandR(fil,0,2,8,1);//write filter
+
+//A.WandR("3000000",0,6,8,1);
+A.WandR("1",0,3,0,1);
+
+A.WandR("1000000",0,6,8,1);
+A.WandR("1000000",2,6,2,1);
+//A.WandR("1000000",3,2,4,1);
+
+A.WandR("1000000",0,6,8,0);
+A.path(1);
+;
+
+
+
+//write filter
 
 //A.WandR(str,0,6,8,1);
 
-A.WandR("1",0,3,0,1);//en_filter
 
-A.WandR("1000000",0,6,8,1);
+
+
+
+
 //A.WandR((char *)(A.av.substr(1, A.av.find(' ')-1)+"\0\n").c_str(),0,6,8,1);
 
 
 
-A.WandR("1000000",3,2,4,1);
 getchar();
-while(A.WandR("1000000",2,6,2,0)==-1);
-while(A.WandR("1000000",2,6,3,0)==-1);
+//while(A.WandR("1000000",2,6,2,0)==-1);
+//while(A.WandR("1000000",2,6,3,0)==-1);
 A.WandR("manual",0,5,2,1);
-A.WandR("70",0,5,4,1);
+A.WandR("40",0,5,4,1);
 A.WandR("1",0,5,6,1);
-A.WandR("1",0,5,0,1);
+A.WandR("0",0,5,0,1);
+A.WandR("0",0,5,9,1);
+
+A.WandR("3000000",0,6,8,1);
+A.WandR("0",0,3,0,1);
+//A.WandR("1000000",3,2,4,1);////XXXXXXXXXXXXXXXXXX
+A.fir(fil ,1000000,1000000);
+A.WandR(fil,0,2,8,1);
+
+
+//A.WandR("3000000",0,6,8,1);
+A.WandR("1",0,3,0,1);
+
+A.WandR("1000000",0,6,8,1);
+A.WandR("1000000",2,6,2,1);
+//A.WandR("1",0,1,6,1);
 //A.WandR("1",0,5,0,1);
 getchar();
 
-A.intwrite("192.168.2.1",32000);
+A.intwrite("192.168.2.1",32768);
 
 
 
 
 
 //A.WandR("3000000000",3,0,0,0);
-comp f[32000];
-unsigned char te[8001];
-te[0]=0x33;
-te[1]=0x33;
-te[2]=0x33;
-for(int i=3;i<8001;i++){
-         te[i]=0xcc;
+comp f[32768];
+unsigned char te[10001];
+
+for(int i=0;i<2;i++){
+         te[i]=0x63;
+
+}
+
+for(int i=2;i<4096;i++){
+         te[i]=0x63;//rand();//0x00;
 
 }
     //sine(f,32000,4,1,45*3.141/180.0);
-   QPSk2(&f[0],te,32000,8);
+   QPSk2(&f[0],te,32768,8);
   // f[0].i=0x7f,f[0].Q=0x7f;
    char  *buf=(char *)f;
-   A.intread("192.168.2.1",32000);
+A.intread("192.168.2.1",32768);
 A.WandR("0x80000088 0x6",3,1,1,1);
 A.WandR("2147483784",3,1,1,1);
    /*
+
    int I=0,Q=0;
    char tt[32000];
 short tt2[32000];
@@ -1246,17 +1527,23 @@ getchar();*/
 //A.WandR("20000000",2,6,2,1);
 
 
-comp f1[32000];
+comp f1[32768];
 char * buf2=(char *)f1;
-int u=0;
-A.readbuff(buf2,32000*4);A.readbuff(buf2,32000*4);A.readbuff(buf2,32000*4);A.readbuff(buf2,32000*4);
+int u=0,st=0;
+
+
+
+st+=A.readbuff(buf2,32768*4);st+=A.readbuff(buf2,32768*4);st+=A.readbuff(buf2,32768*4);st+=A.readbuff(buf2,32768*4);
+
+
+
 while(u<1){
 
    // thread F(&adalm::writebuff,&A,buf,32000*4);
    // usleep(500);
    //
 
-   A.writebuff(buf,32000*4);
+   A.writebuff(buf,32768*4);
 
 //thread F1(&adalm::readbuff,&A,(char*)f,32000*4);
 //cout<<"dd";
@@ -1265,8 +1552,11 @@ while(u<1){
   //F1.join();
  // thread F2(&adalm::readbuff,&A,(char*)f,32000*4);
 
-A.readbuff(buf2,32000*4);
+cout<<A.readbuff(buf2,32768*4);
 
+//cout<<A.readbuff(buf2,32000*4);
+//A.writebuff(buf,32000*4);
+//A.readbuff(buf2,32000*4);
  // F2.join();
 //F.join();
 //
@@ -1277,22 +1567,124 @@ u++;
 //A.WandR("3000000000",2,0,0,0);
 
 }
-int k=0;
-short hh[32000];
-com2re(f1,hh,32000);
-//for(int i=0;i<32000*4;i++2)printf("%x%x    ",buf2[i],buf2[i+1]);
+auto s = chrono::steady_clock::now();
+// A.writebuff(buf,32768*4);
+auto E = chrono::steady_clock::now();
+auto duration = chrono::duration_cast<chrono::microseconds>(E - s);
+cout << "Elapsed: " <<duration.count() << " us\n";
 //exit(1);
+int k=0;
+short hh[32768];
+//for(int i=0;i<16000;i++)printf("(0x%02X,0x%02X),  ",(int)(uint16_t) f1[i].i,(int)(uint16_t) f1[i].Q);
+//exit(1);
+//
+
+int su=com2re(f1,hh,32768);
+
+cout<<A.readbuff(buf2,32768*4);
+
+com2reT(f1,&hh[su],32768);
+//for(int i=0;i<32000;i++)cout<<i<<":"<<(short*)hh[i]<<"  ";
+//cout<<endl<<32000-su;
+//
+//cout<<(32000*4)-su;
+//exit(1);
+su+=32768;
+char ne[su],ll;
+short2byte(&hh[0],&ne[0],su);
+su=(su-(su%8));
+cout<<"comp"<<su<<endl;
+char com[su],com2[su];
+//for(int i=0;i<3200;i++)cout<<ne[i]<<",   ";
+int cu[3];
+int kj=S_comp(&ne[0],com, su ,8);
+/*
+cu[0]=kj;
+cout<<kj<<"  ";
+kj=S_comp(com,com2, kj ,8);
+cout<<kj;
+cu[1]=kj;
+kj=S_comp(com2,com, kj ,8);
+cout<<kj;
+cu[2]=kj;
+*/
+cout<<kj;
+kj=S_decomp((unsigned char *)&com[0], (unsigned char *)&com2[0], kj-1 ,8);
+//cout<<kj;
+//kj=S_decomp((unsigned char *)&com2[0], (unsigned char *)&com[0], cu[1]-1 ,8);
+//cout<<kj;
+//kj=S_decomp((unsigned char *)&com[0], (unsigned char *)&com2[0], cu[0]-1 ,8);
+cout<<kj;
+
+//for(int i=32000-10;i<32000;i++)cout<<i<<":"<<(short)ne[i]<<"  ";
+//kj=S_decomp((unsigned char *)&com[0], (unsigned char *)com2, kj-1 ,8);
+cout<<endl;
+//A.WandR("",3,0,1,0);
+//A.WandR("",3,0,1,0);
+
+//for(int i=0;i<100;i++)cout<<(short)hh[i]<<",   ";
+float th=cal(com2,8,0.7853);// ana(com2,kj,0);
+ana(com2,kj,th);
+kj=sy2by(com2,(unsigned char *)com,8,th,kj);
+//for(int i=0;i<1024;i++)cout<< static_cast<unsigned int8_t>(com[i])<<"=="<<(short)te[i]<<"  ,";
+//exit(1);
+//cout<<"comp"<<kj<<endl;
+while(1)
+{
+  //
+
+ //usleep(32000) ;
+
+
+
+   A.readbuff(buf2,32768*4);
+//auto s = chrono::steady_clock::now();
+//A.writebuff(buf,32000*4);
+ //auto E = chrono::steady_clock::now();
+   com2reT(f1,hh,32768);
+   short2byte(&hh[0],&ne[0],32768);
+
+    kj=S_comp(&ne[0],com, 32768 ,8);
+    S_decomp((unsigned char *)&com[0], (unsigned char *)com2, kj-1 ,8);
+   cout<< kj<<endl;
+   for(int i=0;i<100;i++)cout<<(short)ne[i]<<",  ";
+ana(com2,32768,th);
+exit(1);
+  // auto duration = chrono::duration_cast<chrono::milliseconds>(E - s);
+
+   // cout << "Elapsed: " <<duration.count() << " ms\n";
+
+
+}
+for(int i=10000;i<5;i++){
+      //  if(i%8==0)cout<<endl<<i<<endl;
+    // cout<<endl<<i<<":"<<((int)com2[i])<<"  "<<(int)ne[i];
+
+}
+
+//cout<<kj<<endl;
+//for(int i=0;i+=5;i<kj)cout<<(int)com[i]<<"  ";
+//exit(1);
+//for(int i=0;i<su;i++)cout<<(int)ne[i]<<"   ";
+
+//ana(ne,32768);
+exit(1);
+cin>>ll;
+if(ll=='a')
+{
+    for(int i=0;i<su;i++)
+    {
+        printf("0x%02X , ",(int)(uint16_t) hh[i]);
+    }
+}
+exit(1);
+
 for(int i=0 ;i<32000;i++)
 {if(sqrt(pow(f1[i].i,2)+pow(f1[i].Q,2))>0xff&&k==0)k=1;
   if(1)  printf("%x   %x   ",f1[i].i,f1[i].Q);
 }
 
-//A.WandR("3000000000",0,0,5,1);
-//A.WandR("1000000",3,2,4,1);
-//A.WandR("k",0,2,8,1);
-//A.WandR("1",0,3,0,1);
-//
-//A.WandR(dd,0,0,8,0);
+
 
 
     closesocket(A.con);
