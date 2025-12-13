@@ -5,7 +5,10 @@
 #include <map>
 #include <math.h>
 #include <string>
+#include <vector>
+#include <algorithm>
 #include<unistd.h>
+#include <limits>
 #define M_PI 3.14159265358979323846
 using namespace std;
 
@@ -18,7 +21,13 @@ struct comp
 {
     short  i,Q ;
 };
+struct Centroid {
+    float x;
+    float y;
+};
 int sim(int b);
+void de_Dpsk(char *A,int len ,int N,unsigned char *d);
+void Dpsk(comp *dpsk,unsigned char * data,int len ,int N);
 void com2mag(int len , short * A,comp * d);
 int che(char *A);
 void sine(comp * A,int len,int N,int S,float th);
@@ -35,14 +44,22 @@ template <typename t> float demod(t *A ,int N);
 char deQPSK(char *A ,int N, float th );
 int sy2by(char *A,unsigned char *B,int N,float th,int len);
 double BER(unsigned char *A,unsigned char *B, int l);
-void short2byte(short *A, char* B,int len);
+int short2byte(short *A, char* B,int len);
+template <typename t> double AvP(t *a,int len);
+float AvA(char *a,int len);
 float er(float a);
-float chint(comp *A,int N,int f);
+int Max(short* a,int len);
+float PO(char *A ,int N );
+float chint(char *A,int N,int f);
+void cor(char *A,comp *a,int N,int len);
 int com2re(comp *A,short *B, int len);
 float cal(char *B1,int N,float ph);
-float ana(char * B1,int l,float g);
+int ana(char * B1,int l,float g,float *th);
 double gaussian_sample(double mean, double stddev);
 void start();
+
+void computeKMeansAngles(const comp* samples, int length, float* outAngles);
+
 static double urand();
 class adalm
 {public:
