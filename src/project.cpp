@@ -10,39 +10,53 @@ std::map<int,map<std::string, std::map<int, std::string>>> channels;
 int sim(int b)
 {
     cout<<"dd"<<endl;
- char ne[40000],com[40000],com2[40000];
- unsigned char data[1250];
- comp f[40000];
-short hh[40000];
-int kj;
+ char ne[80000],*com=(char*)malloc(100000 * sizeof(char)),com2[80000];
+  if (!com) {
+        std::cerr << "Memory allocation failed\n";
+        return 1;
+    }
 
- for(float n=0;n<20;n+=0.25){double er=0,co=0;
- for(int c=0;c<100;c++){
+ unsigned char data[1250];
+ comp f[80000];
+short hh[80000],hh2[40000];
+int kj;
+float av=0,db=17;
 for(int i=0;i<1250;i++)data[i]=rand()%256;
+ for(float n=2;db>-6;n+=1,db--){double er=0,co=0;
+float  lin=pow(10,(db-6)/10);
+ for(int c=0;c<100;c++){
+
 
  QPSk2(f,data,40000,8);
 
 com2reT(f,hh,40000);
 
+
+av=AvP(hh,80);
+
+ for(int ii=0;ii<40000;ii++)hh[ii]+=(short)gaussian_sample(0,sqrt((float) av/lin));
+
  short2byte(&hh[0],&ne[0],40000);
-
- for(int ii=0;ii<40000;ii++)ne[ii]+=gaussian_sample(0, n);//(rand()%n)-(n/2);
-
-if(b){
-kj=S_comp(&ne[0],com, 40000 ,8,2);
+double av1=av*0.003845;//AvP(&ne[0],80);
+ //for(int ii=0;ii<40000;ii++)cout<<(short)ne[ii]<<",  ";
+//cout<<n<<":"<<gaussian_sample(0, n)<<endl;
+if(1){
+kj=S_comp(&ne[0],com, 40000 ,4,round(sqrt(av1*0.01)));
 co=kj;
- kj=S_decomp((unsigned char *)&com[0], (unsigned char *)&com2[0], kj-1 ,8);
 
- sy2by(com2,(unsigned char *)com,8,0,kj);
+ kj=S_decomp((unsigned char *)&com[0], (unsigned char *)&com2[0], kj-1 ,4);
+
+sy2by(com2,(unsigned char *)com,8,0,kj);
 }
 else{
    sy2by(ne,(unsigned char *)com,8,0,40000);
 
 }
 //cout<<c<<":";
+
  er+=BER((unsigned char *)com,data,10000);
  }
- cout<<"at noise="<<n<<" cmpression="<<co<<" error="<<er<<endl;
+ cout<<"SNR="<<db<<" cmpression="<<co<<" error="<<er/1000000<<endl;
  }
 }
 
@@ -98,12 +112,44 @@ unsigned char a=0;
 
   // *data=*data>>2;
 
-   sine(&Qpsk[i],N,N,1,ph[a]);
+   sine(&Qpsk[i],N,N,4,ph[a]);
 
 
    }
  return;
 }
+void Dpsk(comp *dpsk,unsigned char * data,int len ,int N)
+{
+   float ph[2]={M_PI,0};
+unsigned char a=0,c=0;
+sine(&dpsk[0],N,N,4,ph[0]);
+for(int i=N,v=0;v<len;i++)
+{
+    a=data[i];
+for(int ii=0;ii<8;ii++,v+=N)
+{c=((a&1)^c);
+  sine(&dpsk[v],N,N,4,ph[c]);
+  a=a>>1;
+}
+
+
+}
+
+ return;
+}
+void de_Dpsk(char *A,int len ,int N,unsigned char *d)
+{int a=0;
+
+    for(int i=0,x=0;i<len-N;i+=N,x++,x=x%N)
+{
+    a=0;
+ for(int ii=0;ii<N;ii++)a+=A[i+ii]*A[i+ii+N]  ;
+ d[i]|=((a>0)<<x);
+
+}
+
+}
+
 
 
 void QPSk(comp *Qpsk,unsigned char * data,int len ,int N)
@@ -215,9 +261,6 @@ for(int I=0;I<N;I++){
 }
     d+=(N+1);
 
-
-
-
 s=0;
 ra=i;
    }
@@ -226,8 +269,9 @@ d-=N+1;
 return d;
 }
 
+
 int S_decomp(unsigned char *A,unsigned  char *B, int len ,int N)
-{char en[len*2];
+{char *en=(char*)malloc(len*2 * sizeof(char));
 int ii=0,ra=0;
 std::fill(en, en+(len*2), 1);
 
@@ -264,7 +308,90 @@ return ii;
 double add_angles(double a, double b) {
     return normalize_angle(a + b);
 }
+void computeKMeansAngles(const comp* samples, int length, float* outAngles,int K) {
 
+    const int maxIterations = 50;
+
+    Centroid centroids[K];
+
+    // --- 1. Initialization ---
+    // We pick points spread evenly across the array (0, 25, 50, 75...)
+    // to ensure we hit different groups if the data is sorted.
+    for (int i = 0; i < K; ++i) {
+        int index = i * (length / K);
+        if (index < length) {
+            centroids[i].x = (float)samples[index].i;
+            centroids[i].y = (float)samples[index].Q;
+        } else {
+            centroids[i] = {0.0f, 0.0f};
+        }
+    }
+
+    // Dynamic allocation for assignments
+    int* assignments = new int[length];
+
+    // --- 2. Main Loop ---
+    for (int iter = 0; iter < maxIterations; ++iter) {
+        bool changed = false;
+
+        // Step A: Assign points
+        for (int i = 0; i < length; ++i) {
+            float minDistSq = 3.40282e+38F; // Max float
+            int bestCluster = 0;
+
+            // Cast short to float for calculation
+            float sx = (float)samples[i].i;
+            float sy = (float)samples[i].Q;
+
+            for (int k = 0; k < K; ++k) {
+                float dx = sx - centroids[k].x;
+                float dy = sy - centroids[k].y;
+                float distSq = dx*dx + dy*dy;
+
+                if (distSq < minDistSq) {
+                    minDistSq = distSq;
+                    bestCluster = k;
+                }
+            }
+
+            if (assignments[i] != bestCluster) {
+                assignments[i] = bestCluster;
+                changed = true;
+            }
+        }
+
+        // Optimization: Stop if no points changed clusters
+        if (!changed && iter > 0) break;
+
+        // Step B: Update Means
+        float sumX[K] = {0};
+        float sumY[K] = {0};
+        int count[K] = {0};
+
+        for (int i = 0; i < length; ++i) {
+            int id = assignments[i];
+            sumX[id] += (float)samples[i].i;
+            sumY[id] += (float)samples[i].Q;
+            count[id]++;
+        }
+
+        for (int k = 0; k < K; ++k) {
+            if (count[k] > 0) {
+                centroids[k].x = sumX[k] / count[k];
+                centroids[k].y = sumY[k] / count[k];
+            }
+        }
+    }
+
+    // --- 3. Convert Mean Centroids to Angles ---
+    for (int k = 0; k < K; ++k) {
+        // atan2 returns Radians (-PI to +PI)
+        outAngles[k] = std::atan2(centroids[k].y, centroids[k].x);
+    }
+
+    // Clean up memory
+    delete[] assignments;
+}
 
 double subtract_angles(double a, double b) {
     return normalize_angle(a - b);
@@ -294,6 +421,18 @@ template <typename t> float demod(t *A ,int N)
    }
    return atan2(-b,a);
 }
+float PO(char *A ,int N )
+{
+   float I=0,Q=0;
+   for(int i=0;i<N;i++)
+   {I+=(cos(M_PI*2*((float)i/N))*A[i]);
+    Q+=(-sin(M_PI*2*((float)i/N))*A[i]);
+   }
+   float b=2*sqrt(pow(I,2)+pow(Q,2))/N;
+   b=pow(b,2);
+   return b/2;
+}
+
 char deQPSK(char *A ,int N, float th )
 {
    float I[N],Q[N];
@@ -313,9 +452,16 @@ char deQPSK(char *A ,int N, float th )
     unsigned char c=0;
     if(a>0)c|=1;
     if(b>0)c|=2;
-//cout<<a<<"_"<<b<<",    ";
+//cout<<"_"<<atan2(b,a)*(180/M_PI)<<",    ";
     return c;
 
+}
+
+int Max(short *a,int len)
+{
+    short b=0;
+    for(int i=0;i<len;i++)if(abs(a[i])>b)b=abs(a[i]);
+    return b;
 }
 
 int sy2by(char *A,unsigned char *B,int N,float th,int len)
@@ -346,21 +492,39 @@ double BER(unsigned char *A,unsigned char *B, int l)
     return e;
 }
 
-void short2byte(short *A, char* B,int len)
+int short2byte(short *A, char* B,int len)
 {
   float c=0;
+  int m=Max(A,len);
   for(int i=0;i<len;i++)
   {
-    c= ((( float)A[i]/(2048))*127) ;
-
+   // c= ( float)A[i]*(127/m) ;
+c=A[i];
    B[i]=(signed char)c;
 
    //cout<<(int)B[i]<<endl;
   }
 
-  return;
+  return m;
 }
 
+template <typename t>
+double AvP(t *a,int len)
+{
+   long long b=0;
+   for(int i =0; i<len;i++) b+=(long long )(a[i]*a[i]) ;
+
+   return (double)b/len;
+}
+template double AvP<short>(short*, int);
+template double AvP<float>(float*, int);
+template double AvP<char>(char*, int);
+float AvA(char *a,int len)
+{
+   int b=0;
+   for(int i =0; i<len;i++) b+=a[i];
+   return (float)b/len;
+}
 float er(float a)
 {float g[4]={0.785,-2.356,-0.785,2.356};
     float t=30;
@@ -372,16 +536,37 @@ float er(float a)
     return t;
 }
 
-float chint(comp *A,int N,int f){
+float chint(char *A,int N,int f){
 float a,b;
 
 for(int i=0;i<N;i++){
-  a+=cos(M_PI*f*2*((float)i/N))*A[i].i;
-    b+=-sin(M_PI*f*2*((float)i/N))*A[i].i;
+  a+=cos(M_PI*f*2*((float)i/N))*A[i];
+    b+=-sin(M_PI*f*2*((float)i/N))*A[i];
 
 }
 //cout<<"::::"<<sqrt(pow(a/8,2)+pow(b/8,2))<<"<<<<<<<<";
-return sqrt(pow(a/8,2)+pow(b/8,2));
+return  sqrt(pow(a/N,2)+pow(b/N,2));
+}
+
+void cor(char *A,comp *c,int N,int len){
+    float I[N],Q[N];
+    for(int i=0;i<N;i++)
+    {
+        I[i]=cos(M_PI*2*((float)i/N));
+        Q[i]=-sin(M_PI*2*((float)i/N));
+    }
+    for(int ii=0,v=0;ii<len;ii++,v+=8){
+float a=0,b=0;
+for(int i=0;i<N;i++)
+    {
+  a+=I[i]*A[i+v];
+  b+=Q[i]*A[i+v];
+
+    }
+c[ii].i=a;
+c[ii].Q=b;
+    }
+return;
 }
 
 int com2re(comp *A,short *B, int len)
@@ -392,7 +577,7 @@ int com2re(comp *A,short *B, int len)
 int g=0;
  for(int i=0,k=0;i<len;i++){
 //cout<<A[i].i<<"="<<A[i].Q<<endl;
-        if(sqrt(pow(A[i].i,2)+pow(A[i].Q,2))>0x1A&&k==0)
+        if(sqrt(pow(A[i].i,2)+pow(A[i].Q,2))>0x12&&k==0)
  {
     // if(chint(&A[i],8,1)>chint(&A[i],8,2))
         k=1;
@@ -440,7 +625,6 @@ cout<<demod< char>(&B1[i],8)*(180/M_PI)<<"   ";
 }
 int com2reT(comp *A,short *B, int len)
 {
-
 int g=0;
  for(int i=0,k=0;i<len;i++)
     {
@@ -455,40 +639,70 @@ float cal(char *B1,int N,float ph)
    return atan2f(sinf(ph - demod<char>(&B1[0],N)), cosf(ph - demod<char>(&B1[0],N)));
 }
 
-float ana(char * B1,int l,float g)
+int ana(char * B1,int l,float g,float *th)
 {
-float th=g;
-if(g==0)th=atan2f(sinf(0.785 - demod<char>(&B1[0],8)), cosf(0.785 - demod<char>(&B1[0],8)));
+
+//if(g==0)th=atan2f(sinf(0.785 - demod<char>(&B1[16],8)), cosf(0.785 - demod<char>(&B1[16],8)));
+
 //if(demod<char>(&B1[0],8)<0.785)th=-th;
 int m=0;
-cout<<demod<char>(&B1[0],8)*(180/M_PI)<<endl;
 float t=0,z=5000;
+
+
+/*
 for(int i=0;i<8;i++)
 {
 t=0;
 
-for(int ii=i;ii<(i+(8*8));ii+=8)
-    {
-t+=er(subtract_angles((demod<char>(&B1[ii],8)),-th));
-cout<<(demod(&B1[ii],8))*(180/M_PI)<<"   ";
+for(int ii=i;ii<(i+(8*10));ii+=8)
+    {//chint(B1[ii],8);
+//t+=er(subtract_angles((demod<char>(&B1[ii],8)),-th));
+//cout<<(subtract_angles((demod<char>(&B1[ii],8)),-th))*(180/M_PI)<<"   ";
+
+
+//cout<<chint(&B1[ii],8,1)<<":"<<chint(&B1[ii],8,2)<<"  ";
+t+=chint(&B1[ii],8,2);
   }
 t/=8;
-cout<<t<<endl<<endl;
+//cout<<endl<<t<<endl<<endl;
 if(z>t)z=t,m=i;
 }
+*/
+//cout<<">>>"<<m<<":"<<demod< char>(&B1[m],8)<<endl;
+//m=1;/////////////////////////xxxxxxxx
+float mi=99999;
+for(int i=0;i<8;i++){
+comp f[1000];
+cor(&B1[i],f,8,1000);
+float gr[5],mean=0;
+computeKMeansAngles(f,100,gr,4);
+sort(gr,gr+4);
+mean+=abs(subtract_angles(an_difference(gr[0],gr[1]),1.57079));
+mean+=abs(subtract_angles(an_difference(gr[1],gr[2]),1.57079));
+mean+=abs(subtract_angles(an_difference(gr[2],gr[3]),1.57079));
+mean+=abs(subtract_angles(an_difference(gr[0],gr[3]),1.57079));
+if(mean<mi)mi=mean,m=i;
+//cout<<i<<":"<<mean*(180/M_PI)/4<<endl;
+//for(int i =0;i<4;i++)cout<<gr[i]*(180/M_PI)<<":"<<endl;
 
-cout<<">>>"<<m<<":"<<demod< char>(&B1[m],8)<<endl;
-//m=0;
+}
 
-  cout<<th*(180/M_PI)<<endl;
+//m=1;
+if(g==0)*th=atan2f(sinf(-2.3561944 - demod<char>(&B1[8+m],8)), cosf(-2.3561944 - demod<char>(&B1[8+m],8)));
+
+//exit(1);
+
+//cout<<"at :"<<m;
+
+ // cout<<*th*(180/M_PI)<<endl;
 for(int i=m;i<l/8;i+=8)
 {//i-=(int)(er(demod(&B[i],8))/1.57)*4;
 
-cout<<subtract_angles((demod<char>(&B1[i],8)),-th)*(180/M_PI)<<"   ";
+//cout<<subtract_angles((demod<char>(&B1[i],8)),-*th)*(180/M_PI)<<"   ";
 //cout<<demod<char>(&B1[i],8)*(180/M_PI)<<"   ";
 }
 
-return th;
+return m;
 }
 
 
@@ -1418,3 +1632,4 @@ double gaussian_sample(double mean, double stddev) {
     double z0 = r * cos(theta); /* standard normal */
     return mean + stddev * z0;
 }
+
