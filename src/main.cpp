@@ -7,7 +7,8 @@
 
 int main() {
 //sim(1);
-//cout<<"dd";
+
+cout<<"dd";
 //exit(1);
 adalm A;
     start();
@@ -61,8 +62,8 @@ char fil[2000];
 A.path(1);
 
 
-A.WandR("2662000000",0,1,5,1);
-A.WandR("2662000000",0,0,5,1);
+A.WandR("2700000000",0,1,5,1);
+A.WandR("2700000000",0,0,5,1);
 //A.WandR("100000",0,9,2,1);
 //A.WandR("100000",0,5,7,1);
 
@@ -118,7 +119,7 @@ getchar();
 //while(A.WandR("1000000",2,6,3,0)==-1);
 A.WandR("manual",0,5,2,1);
 A.WandR("40",0,5,4,1);
-A.WandR("0",0,5,6,1);
+A.WandR("1",0,5,6,1);
 A.WandR("1",0,5,0,1);
 A.WandR("1",0,5,9,1);
 
@@ -146,19 +147,23 @@ A.intwrite("192.168.2.1",65536);
 
 //A.WandR("3000000000",3,0,0,0);
 comp f[65536];
-unsigned char te[10001];
+unsigned char te[10001],data[10001]={0};
 
-for(int i=0;i<2;i++){
-         te[i]=0x63;
 
-}
+         te[0]=0x63;
+         te[1]=0x9c;
+
+
 
 for(int i=2;i<4096;i++){
-         te[i]=rand();//0x00;
+         te[i]=rand()%256;//0x00;
 
 }
     //sine(f,32000,4,1,45*3.141/180.0);
-   QPSk2(&f[0],te,65536,8);
+    sine(f,8,8,4,0);
+    //sine(f+8,8,8,2,M_PI);
+    //sine(f+16,8,8,2,0);
+   QPSk2(&f[8],te,65536,8);
   // f[0].i=0x7f,f[0].Q=0x7f;
    char  *buf=(char *)f;
 A.intread("192.168.2.1",32768);
@@ -233,12 +238,17 @@ cout << "Elapsed: " <<duration.count() << " us\n";
 //exit(1);
 int k=0;
 short hh[162768];
+short hh1[162768];
 //for(int i=0;i<16000;i++)printf("(0x%02X,0x%02X),  ",(int)(uint16_t) f1[i].i,(int)(uint16_t) f1[i].Q);
 //exit(1);
 //
 
+//for(int i=0;i<32000;i++)cout<<(short)f1[i].i<<",    ";
 int su=com2re(f1,hh,32768);
 
+//for(int i=0;i<32768;i++)cout<<(short)f1[i].i<<",   ";
+
+//exit(1);
 cout<<A.readbuff(buf2,32768*4);
 
 com2reT(f1,&hh[su],32768);
@@ -246,49 +256,103 @@ com2reT(f1,&hh[su],32768);
 cout<<A.readbuff(buf2,32768*4);
 
 com2reT(f1,&hh[su+32768],32768);
-//for(int i=0;i<32000;i++)cout<<i<<":"<<(short*)hh[i]<<"  ";
+cout<<endl;
 //cout<<endl<<32000-su;
 //
 //cout<<(32000*4)-su;
 //exit(1);
+
 su+=(32768*2);
-char ne[su],ll;
-short2byte(&hh[0],&ne[0],su);
-su=(su-(su%8));
-cout<<"comp"<<su<<endl;
+
+char ne[su],ne2[su],ll;
+int kj,h=0;
+for(float db =18;db>-6;db--){
+float e=0,lin=pow(10,(float)(db-6)/10);
+
+
+
+for(int ii=0;ii<100;ii++){
+
+int ma=short2byte(&hh[6],&ne[0],su);
+
+for(int i=6;i<40000;i++)
+{
+  if(abs(hh[i])>127)exit(1);
+//cout<<(short)ne[i]<<",  ";
+}
+//exit(1);
+for(int i=0;i<su;i++)hh1[i]=hh[i];
+float th=0;//=cal(&com[9],8,-2.3561944);
+int m=ana(ne,8000,0,&th);
+if(db==18&&ii==0)cout<<"m="<<m<<endl;
+
+double av=AvP(&hh1[m],80);
+
+
+
+for(int i=m;i<40000;i++)
+{
+       // if((int)ne[i]+gaussian_sample(0, sqrt(av))>127)exit(1);
+      //   if((int)ne[i]+gaussian_sample(0, sqrt(av))<-127)exit(1);
+    hh1[i]+=(short)gaussian_sample(0, sqrt((double)av/lin));
+
+    //cout<<hh1[i]<<",   ";
+
+}
+short2byte(&hh1[6],&ne[0],su);
+
+//su=(su-(su%8))8
+//cout<<"Data size: "<<su<<endl;
+
 char com[su],com2[su];
 
- //for(int i=0;i<su;i++)ne[i]+=(rand()%16)-7;
- //for(int i=0;i<3200;i++)cout<<(short)ne[i]<<",   ";
-int kj=S_comp(&ne[0],com, su ,4,2);
+ //cout<<"signal power:"<<av<<endl;
 
-cout<<kj;
+
+
+
+ kj=S_comp(&ne[0],com, 40000 ,4,round(sqrt(av)*0.7));//round(sqrt(av))*0
+
+ //cout<<round(sqrt(av))<<endl;
+ h=kj;
+//exit(1);
+//cout<<"compress date :"<<kj<<endl;
+//exit(1);
 kj=S_decomp((unsigned char *)&com[0], (unsigned char *)&com2[0], kj-1 ,4);
 //cout<<kj;
 //kj=S_decomp((unsigned char *)&com2[0], (unsigned char *)&com[0], cu[1]-1 ,8);
 //cout<<kj;
 //kj=S_decomp((unsigned char *)&com[0], (unsigned char *)&com2[0], cu[0]-1 ,8);
-cout<<kj;
+//cout<<"Decompressed data"<<kj<<endl;
 
 //for(int i=32000-10;i<32000;i++)cout<<i<<":"<<(short)ne[i]<<"  ";
 //kj=S_decomp((unsigned char *)&com[0], (unsigned char *)com2, kj-1 ,8);
-cout<<endl;
+//cout<<endl;
 //A.WandR("",3,0,1,0);
 //A.WandR("",3,0,1,0);
 
-for(int i=0;i<100;i++)cout<<(short)hh[i]<<",   ";
-float th=cal(com2,8,0.7853);
-// th=ana(com2,kj,0);
+
+
+
  //for(int i=0;i<kj;i++)com2[i]+=(rand()%16)-7;
-kj=sy2by(com2,(unsigned char *)com,8,th,kj);
-//for(int i=0;i<1250;i++)cout<< static_cast<unsigned int8_t>(com[i])<<"=="<<(short)te[i]<<"  ,";
-cout<<BER((unsigned char *)com,te,10000);
-exit(1);
+kj=sy2by(&com2[m],data,8,th,kj);
+//de_Dpsk(ne,su,8,data);
+
+//cout<<endl;
+//for(int i=0;i<1250;i++)cout<< static_cast<unsigned int8_t>(data[i])<<"=="<<(short)te[i]<<"  ,";
+
+e+=BER((unsigned char *)data,te,10000);
+
+
+}
+cout<<"CNR="<<db<<" cmpression="<<h<<" BER="<<e/1000000<<endl;
+
+}
 //cout<<"comp"<<kj<<endl;
 while(1)
 {
   //
-
+/*
  //usleep(32000) ;
 
 
@@ -300,17 +364,17 @@ while(1)
    com2reT(f1,hh,32768);
    short2byte(&hh[0],&ne[0],32768);
 
-    kj=S_comp(&ne[0],com, 32768 ,8,2);
-    S_decomp((unsigned char *)&com[0], (unsigned char *)com2, kj-1 ,8);
+    kj=S_comp(&ne[0],com, 32768 ,4,2);
+    S_decomp((unsigned char *)&com[0], (unsigned char *)com2, kj-1 ,4);
    cout<< kj<<endl;
-   for(int i=0;i<100;i++)cout<<(short)ne[i]<<",  ";
-ana(com2,32768,th);
+   //for(int i=0;i<100;i++)cout<<(short)ne[i]<<",  ";
+//ana(com2,32768,th);
 exit(1);
   // auto duration = chrono::duration_cast<chrono::milliseconds>(E - s);
 
    // cout << "Elapsed: " <<duration.count() << " ms\n";
 
-
+*/
 }
 for(int i=10000;i<5;i++){
       //  if(i%8==0)cout<<endl<<i<<endl;
