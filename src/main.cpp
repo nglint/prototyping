@@ -4,10 +4,8 @@
 #pragma comment(lib, "Ws2_32.lib")
 
 
-
 int main() {
 //sim(1);
-
 cout<<"dd";
 //exit(1);
 adalm A;
@@ -273,15 +271,17 @@ float e=0,lin=pow(10,(float)(db-6)/10);
 
 for(int ii=0;ii<100;ii++){
 
-int ma=short2byte(&hh[6],&ne[0],su);
-
-for(int i=6;i<40000;i++)
-{
-  if(abs(hh[i])>127)exit(1);
+short2byte2(&hh[6],&ne[0],40006);
+//for(int i=0;i<4000;i++)cout<<(short)ne[i]<<",   ";
+//exit(1);
+for(int i=6;i<40006;i++)
+{//cout<<i<<endl;
+ // if(abs(hh[i])>127)exit(1);
 //cout<<(short)ne[i]<<",  ";
 }
 //exit(1);
-for(int i=0;i<su;i++)hh1[i]=hh[i];
+
+for(int i=0;i<su;i++)hh1[i]=hh[i]/2;
 float th=0;//=cal(&com[9],8,-2.3561944);
 int m=ana(ne,8000,0,&th);
 if(db==18&&ii==0)cout<<"m="<<m<<endl;
@@ -289,18 +289,20 @@ if(db==18&&ii==0)cout<<"m="<<m<<endl;
 double av=AvP(&hh1[m],80);
 
 
-
-for(int i=m;i<40000;i++)
+for(int i=m;i<40006;i++)
 {
-       // if((int)ne[i]+gaussian_sample(0, sqrt(av))>127)exit(1);
-      //   if((int)ne[i]+gaussian_sample(0, sqrt(av))<-127)exit(1);
-    hh1[i]+=(short)gaussian_sample(0, sqrt((double)av/lin));
-
+      //if((int)ne[i]+gaussian_sample(0, sqrt(av))>127)exit(1);
+     // if((int)ne[i]+gaussian_sample(0, sqrt(av))<-127)exit(1);
+  hh1[i]=(short)gaussian_sample(0, sqrt((double)av/lin));
+if(hh1[i]<-127)hh1[i]=-127;
+if(hh1[i]>127)hh1[i]=127;
     //cout<<hh1[i]<<",   ";
 
 }
-short2byte(&hh1[6],&ne[0],su);
+short2byte2(&hh1[6],&ne[0],su);
 
+
+//cout<<av<<endl;
 //su=(su-(su%8))8
 //cout<<"Data size: "<<su<<endl;
 
@@ -308,13 +310,16 @@ char com[su],com2[su];
 
  //cout<<"signal power:"<<av<<endl;
 
+//av=av*((float)(127/ma)*(127/ma));
 
 
+//if(ii==0)zstd_compress(ne,40000);
+//if(ii==0)gzip(ne,40000);
+kj=S_comp(ne,com, 40000 ,4,round(sqrt(av*0.5)));//round(sqrt(av))*0
 
- kj=S_comp(&ne[0],com, 40000 ,4,round(sqrt(av)*0.7));//round(sqrt(av))*0
+//cout<<round(sqrt(av))<<endl;
+h=kj;
 
- //cout<<round(sqrt(av))<<endl;
- h=kj;
 //exit(1);
 //cout<<"compress date :"<<kj<<endl;
 //exit(1);
@@ -334,8 +339,9 @@ kj=S_decomp((unsigned char *)&com[0], (unsigned char *)&com2[0], kj-1 ,4);
 
 
 
- //for(int i=0;i<kj;i++)com2[i]+=(rand()%16)-7;
-kj=sy2by(&com2[m],data,8,th,kj);
+ //for(int i=0;i<1000;i++)cout<<(short)com2[i]<<", ";
+ //exit(1);
+sy2by(&com2[m],data,8,th,kj);
 //de_Dpsk(ne,su,8,data);
 
 //cout<<endl;
@@ -345,8 +351,10 @@ e+=BER((unsigned char *)data,te,10000);
 
 
 }
-cout<<"CNR="<<db<<" cmpression="<<h<<" BER="<<e/1000000<<endl;
-
+//zstd_compress(ne,40000);
+//gzip(com,40000);
+//cout<<"CNR="<<db<<" cmpression="<<h<<" BER="<<e/1000000<<endl;
+cout<<h<<endl;
 }
 //cout<<"comp"<<kj<<endl;
 while(1)
