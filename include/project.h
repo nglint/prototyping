@@ -3,12 +3,17 @@
 #include <stdlib.h>
 #include <iostream>
 #include <map>
+#include <zstd.h>
 #include <math.h>
 #include <string>
 #include <vector>
 #include <algorithm>
 #include<unistd.h>
 #include <limits>
+extern "C" {
+#include <zlib.h>
+}
+
 #define M_PI 3.14159265358979323846
 using namespace std;
 
@@ -26,12 +31,15 @@ struct Centroid {
     float y;
 };
 int sim(int b);
+int gzip(char *data, int len);
+int zstd_compress(const char* input, int inputSize);
 void de_Dpsk(char *A,int len ,int N,unsigned char *d);
 void Dpsk(comp *dpsk,unsigned char * data,int len ,int N);
 void com2mag(int len , short * A,comp * d);
 int che(char *A);
 void sine(comp * A,int len,int N,int S,float th);
 int com2reT(comp *A,short *B, int len);
+void short2byte2(short *A, char* B,int len);
 void ran(comp * A,int len,int N);
 void QPSk2(comp *Qpsk,unsigned char * data,int len ,int N);
 void QPSk(comp *Qpsk,unsigned char * data,int len ,int N);
