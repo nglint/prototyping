@@ -1,5 +1,5 @@
 
-
+#define ulongf long
 #include "project.h"
 
 // Your declarations here
@@ -20,28 +20,28 @@ int sim(int b)
  comp f[80000];
 short hh[80000],hh2[40000];
 int kj;
-float av=0,db=17;
+float av=0,db=18;
 for(int i=0;i<1250;i++)data[i]=rand()%256;
  for(float n=2;db>-6;n+=1,db--){double er=0,co=0;
 float  lin=pow(10,(db-6)/10);
  for(int c=0;c<100;c++){
 
 
- QPSk2(f,data,40000,8);
-
+QPSk2(f,data,40000,8);
 com2reT(f,hh,40000);
-
-
 av=AvP(hh,80);
+for(int ii=0;ii<40000;ii++){
+        hh[ii]+=(short)gaussian_sample(0,sqrt((float) av/lin));
+        if(hh[ii]<-127)hh[ii]=-127;
+        if(hh[ii]>127)hh[ii]=127;
+}
 
- for(int ii=0;ii<40000;ii++)hh[ii]+=(short)gaussian_sample(0,sqrt((float) av/lin));
-
- short2byte(&hh[0],&ne[0],40000);
+ short2byte2(&hh[0],&ne[0],40000);
 double av1=av*0.003845;//AvP(&ne[0],80);
  //for(int ii=0;ii<40000;ii++)cout<<(short)ne[ii]<<",  ";
 //cout<<n<<":"<<gaussian_sample(0, n)<<endl;
 if(1){
-kj=S_comp(&ne[0],com, 40000 ,4,round(sqrt(av1*0.01)));
+kj=S_comp(&ne[0],com, 40000 ,4,round(sqrt(av*0.1)));
 co=kj;
 
  kj=S_decomp((unsigned char *)&com[0], (unsigned char *)&com2[0], kj-1 ,4);
@@ -56,11 +56,86 @@ else{
 
  er+=BER((unsigned char *)com,data,10000);
  }
- cout<<"SNR="<<db<<" cmpression="<<co<<" error="<<er/1000000<<endl;
+ cout<<co<<endl;
  }
 }
 
+int zstd_compress(const char* input, int inputSize)
+{
+    int outputCapacity=ZSTD_compressBound(inputSize);
+//cout<<outputCapacity<<endl;
+    char* output[outputCapacity];
 
+    int cSize = ZSTD_compress(output, outputCapacity,input, inputSize,21);
+
+    if (ZSTD_isError(cSize)) {
+        return 0; // error
+    }
+cout<<cSize<<endl;
+    return cSize;
+}
+
+
+
+int gzip(char *data, int len)
+{
+
+
+
+long long r=0;
+
+    uLongf data_size = len;
+
+
+
+  //  printf("Original size: %lu bytes\n", data_size);
+    uLongf comp_size;
+    comp_size = compressBound(data_size);
+     char comp[comp_size];
+  //   long long t = now_us();
+
+
+    // Allocate compressed buffer
+
+
+    int ret = compress2((Bytef*)comp,(uLongf*)&comp_size,(Bytef*)&data[0], data_size,9 );
+
+    if (ret != Z_OK) {
+       // printf("Compression error: %d\n", ret);
+        return 1;
+    }
+ // for(int i=0;i++;i<109011)  if(data[23] - data[32] >= 2 || data[32] - data[23] >= 2)comp_size=i;
+
+
+   // long long tt = now_us();
+  // r+=(tt-t);
+//printf("Time taken: %lld us\n", r);
+printf("%d \n",comp_size);
+
+
+  /*  // ---- Decompress to verify ----
+
+  char *decomp=(char*)malloc(data_size * sizeof(char));
+
+    uLong decomp_size = data_size;
+
+    ret = uncompress(
+        (Bytef*)decomp, &decomp_size,
+        (Bytef*)comp, comp_size
+    );
+
+    if (ret != Z_OK) {
+        printf("Decompress error: %d\n", ret);
+        return 1;
+    }
+
+    printf("Decompressed size: %lu bytes\n", decomp_size);
+    printf("Match: %s\n", memcmp(data, decomp, data_size) == 0 ? "YES" : "NO");
+
+    free(comp);
+    free(decomp);
+    return 0;*/
+}
 void com2mag(int len , short * A,comp * d)
 {
   for(int i=0;i<len;i++)
@@ -77,6 +152,7 @@ for(int i=0;i<len;i+=N){
   A[i+I].i=(short)(cos((2*M_PI*I/N)+th)*2048)/S;
 
   A[i+I].Q=(short)(sin((2*M_PI*I/N)+th)*2048)/S ;
+
    //printf("(0x%02X,0x%02X),  ",(int)(uint16_t) A[i+I].i,(int)(uint16_t) A[i+I].Q);
 //if(th!=1)cout<<(sqrt(pow(A[i+I].Q,2)+pow(A[i+I].i,2))*cos(atan2(A[i+I].Q,A[i+I].i)))<<",   ";
 //if(th!=1)cout<<A[i+I].i<<"  "<<A[i+I].Q<<"   ";
@@ -254,9 +330,15 @@ s=cc;
     }
 
 B[d]=s;
+if(s==0){
 for(int I=0;I<N;I++){
     B[d+1+I]=A[i+I];//putting the block in the new array
 
+
+}}else
+{for(int I=0;I<N;I++){B[d+1+I]=(int)(A[i+I]+A[i+I+(s*N)])/2;
+
+}
 
 }
     d+=(N+1);
@@ -460,7 +542,9 @@ char deQPSK(char *A ,int N, float th )
 int Max(short *a,int len)
 {
     short b=0;
-    for(int i=0;i<len;i++)if(abs(a[i])>b)b=abs(a[i]);
+    for(int i=0;i<len;i++){
+            if(abs(a[i])>b)b=abs(a[i]);
+    }
     return b;
 }
 
@@ -496,16 +580,33 @@ int short2byte(short *A, char* B,int len)
 {
   float c=0;
   int m=Max(A,len);
+
   for(int i=0;i<len;i++)
   {
-   // c= ( float)A[i]*(127/m) ;
-c=A[i];
+    c= ( float)A[i]*(127/m) ;
+    //c=A[i];
+   B[i]=(signed char)c;
+
+
+  }
+
+  return m;
+}
+void short2byte2(short *A, char* B,int len)
+{
+  float c=0;
+
+
+  for(int i=0;i<len;i++)
+  {
+    //c= ( float)A[i]*(127/m) ;
+    c=A[i];
    B[i]=(signed char)c;
 
    //cout<<(int)B[i]<<endl;
   }
 
-  return m;
+
 }
 
 template <typename t>
@@ -1632,4 +1733,3 @@ double gaussian_sample(double mean, double stddev) {
     double z0 = r * cos(theta); /* standard normal */
     return mean + stddev * z0;
 }
-
