@@ -1,9 +1,13 @@
 #include <stdio.h>
 #include <winsock2.h>
 #include <stdlib.h>
+#include <chrono>
 #include <iostream>
 #include <map>
+#include <complex>
+#include <time.h>
 #include <zstd.h>
+#include <cmath>
 #include <math.h>
 #include <string>
 #include <vector>
@@ -26,30 +30,53 @@ struct comp
 {
     short  i,Q ;
 };
+struct comp1
+{
+    short  i,Q ;
+};
 struct Centroid {
     float x;
     float y;
 };
 int sim(int b);
+int phas (comp1 *A,int len,int m,int vi, float* ph);
+int S_comp1(short *A, char *B, int len ,int N, int v);
+int S_comp2(comp *A, char *B, int len ,int N, int v);
+int S_decomp1(short *A,char *B, int len ,int N);
+int S_decomp2(comp *A,char *B, int len ,int N);
 int gzip(char *data, int len);
+int waever (comp* A,short *B,int len ,int N);
+void depsk(short *A,unsigned char *B,int N,float th,int len);
 int zstd_compress(const char* input, int inputSize);
-void de_Dpsk(char *A,int len ,int N,unsigned char *d);
+char deQPSK2(short *A ,int N, float th );
+int sy2by2(short *A,unsigned char *B,int N,float th,int len);
 void Dpsk(comp *dpsk,unsigned char * data,int len ,int N);
 void com2mag(int len , short * A,comp * d);
 int che(char *A);
+void BPSk(comp *psk,unsigned char * data,int len ,int N);
 void sine(comp * A,int len,int N,int S,float th);
+void sine1(comp * A,int len,int N,int S,float th,int flag);
+int phas2 (comp1 *A,int len,int m,int vi, float* ph);
 int com2reT(comp *A,short *B, int len);
 void short2byte2(short *A, char* B,int len);
+void conv(double *H, short *A, int N, int len);
+int com2im(comp *A,short *B, int len);
+void cconv(double *H, comp *A, int N, int len);
 void ran(comp * A,int len,int N);
 void QPSk2(comp *Qpsk,unsigned char * data,int len ,int N);
 void QPSk(comp *Qpsk,unsigned char * data,int len ,int N);
 int S_comp(char *A, char *B, int len ,int N,int v);
 int S_decomp(unsigned char *A,unsigned  char *B, int len ,int N);
 double add_angles(double a, double b);
+int phas3 (comp1 *A,int len,int m, short* ph);
+short an_difference_deg2(short a, short b);
+template <typename t> float demod1(t *A ,int N,float th);
 double subtract_angles(double a, double b) ;
+template <typename t> int syn (t *A,int len,int N,int m,int vi,float *ph);
 double an_difference(double theta1, double theta2) ;
 template <typename t> float demod(t *A ,int N);
 char deQPSK(char *A ,int N, float th );
+void de_Dpsk(short *A,int len ,int N,unsigned char *d);
 int sy2by(char *A,unsigned char *B,int N,float th,int len);
 double BER(unsigned char *A,unsigned char *B, int l);
 int short2byte(short *A, char* B,int len);
@@ -58,11 +85,12 @@ float AvA(char *a,int len);
 float er(float a);
 int Max(short* a,int len);
 float PO(char *A ,int N );
-float chint(char *A,int N,int f);
-void cor(char *A,comp *a,int N,int len);
+short an_difference_deg(short a, short b);
+float chint(short *A,int N,int f);
+void cor(short *A,comp *a,int N,int len);
 int com2re(comp *A,short *B, int len);
 float cal(char *B1,int N,float ph);
-int ana(char * B1,int l,float g,float *th);
+int ana(short * B1,int l,float g,float *th);
 double gaussian_sample(double mean, double stddev);
 void start();
 
