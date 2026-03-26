@@ -1,5 +1,5 @@
 
-#define ulongf long
+
 #include "project.h"
 
 // Your declarations here
@@ -9,8 +9,9 @@ using namespace std;
 std::map<int,map<std::string, std::map<int, std::string>>> channels;
 int sim(int b)
 {
-    cout<<"dd"<<endl;
- char ne[80000],*com=(char*)malloc(100000 * sizeof(char)),com2[80000];
+    //cout<<"ddmfnvlkmsfnvlks"<<endl;
+
+ char *ne=(char*)malloc(80000 * sizeof(char)),*com=(char*)malloc(100000 * sizeof(char)),*com2=(char*)malloc(80000 * sizeof(char));
   if (!com) {
         std::cerr << "Memory allocation failed\n";
         return 1;
@@ -18,47 +19,157 @@ int sim(int b)
 
  unsigned char data[1250];
  comp f[80000];
-short hh[80000],hh2[40000];
+  comp1 *f1=(comp1*)malloc(80000 * sizeof(comp1));
+short hh[80000],hh2[40000],*hh3=(short*)malloc(80000 * sizeof(short));
 int kj;
-float av=0,db=18;
+float av=0,db=13;
+srand(time(NULL));
 for(int i=0;i<1250;i++)data[i]=rand()%256;
- for(float n=2;db>-6;n+=1,db--){double er=0,co=0;
+
+ for(float n=2;db>6;n+=1,db-=1){double er=0,er2=0,co=0;
 float  lin=pow(10,(db-6)/10);
- for(int c=0;c<100;c++){
-
-
+ for(int c=0;c<200;c++){
+short ph[4];
+char *s=(char*)malloc(200000 * sizeof(char));
+char *z=(char*)malloc(100000 * sizeof(char));
 QPSk2(f,data,40000,8);
+//BPSk(f,data,40000,8);
+
+//Dpsk(f,data,40000,8);
 com2reT(f,hh,40000);
+
+//for(int i=0;i<100;i++)cout<<hh[i]<<",  ";
+
 av=AvP(hh,80);
-for(int ii=0;ii<40000;ii++){
-        hh[ii]+=(short)gaussian_sample(0,sqrt((float) av/lin));
-        if(hh[ii]<-127)hh[ii]=-127;
-        if(hh[ii]>127)hh[ii]=127;
+for(int ii=0;ii<40000;ii++)
+{//cout<<f[ii].i<<",  ";
+       f[ii].i+=gaussian_sample(0,sqrt((float) av/lin));
+       f[ii].Q+=gaussian_sample(0,sqrt((float) av/lin));
+        //if(hh[ii]<-127)hh[ii]=-127;
+       // if(hh[ii]>127)hh[ii]=127;
+}
+//
+auto ss = chrono::steady_clock::now();
+ phas3 (f1,200, 4, ph);
+ auto E = chrono::steady_clock::now();
+auto duration = chrono::duration_cast<chrono::microseconds>(E - ss);
+cout << "Elapsed: " <<duration.count() << " us\n";
+
+}}}
+
+template <typename t>
+int syn (t *A,int len,int N,int m,int vi, float* ph)
+{
+    float  y[len];
+int M=0,e=len,lim =round(90/m);
+
+
+
+for(int v=0;v<=N;v++)
+{
+char yc[len]={0};
+   for(int i =v,ii=0;ii<len;i+=N,ii++) y[ii]=demod(&A[i],N)*(180/M_PI);
+
+   for(int I=-1,o=0;o<m;o++){
+        for(int x=0;x<len;x++)
+        {
+            if(yc[x]==0)
+                {I=x,yc[x]=1;
+
+            break;}
+        }
+
+        if(I==-1){
+                cout<<"notqpsk at -1:"<<v<<endl;
+                break;
+        }
+int cu=0;
+float  av=0;
+   for(int i=I+1;i<len;i++)
+   {
+      float j= (an_difference_deg(y[I],y[i]));
+    // cout<<I<<"-"<<y[I]<<"|||"<<i<<"-"<<y[i]<<"/"<<(short)yc[i]<<"="<<j<<endl;
+      if(j<=vi&&yc[i]==0)
+        {cu++;
+            yc[i]=1;
+            av+=y[i];
+        }
+
+
+   }
+   ph[o]=av/cu;
+   }
+   int errr=0;
+   for(int i=0;i<len;i++)
+{
+    if(yc[i]==0)errr++;
+}
+if(errr<=e){e=errr;
+        M=v;
+
+}
+//cout<<"-notqpsk at:"<<v<<"-->"<<errr<<endl;
+}
+if(e!=0&&vi!=lim)M=-1;
+// cout<<e<<endl;
+return M;
+}
+template int syn<char>(char*, int, int, int, int,float*);
+template int syn<short>(short*, int, int, int, int,float*);
+
+int phas (comp1 *A,int len,int m,int vi, float* ph)
+{
+    float  y[len];
+int M=0,e=len,lim =round(90/m);
+
+
+
+
+char yc[len]={0};
+   for(int i=0;i<len;i++) y[i]=atan2(A[i].Q,A[i].i)*(180/M_PI);
+
+   for(int I=-1,o=0;o<m;o++){
+        for(int x=0;x<len;x++)
+        {
+            if(yc[x]==0)
+                {I=x,yc[x]=1;
+
+            break;}
+        }
+
+        if(I==-1){
+
+                break;
+        }
+int cu=0;
+float  av=0;
+   for(int i=I+1;i<len;i++)
+   {
+      float j= (an_difference_deg(y[I],y[i]));
+    // cout<<I<<"-"<<y[I]<<"|||"<<i<<"-"<<y[i]<<"/"<<(short)yc[i]<<"="<<j<<endl;
+      if(j<=vi&&yc[i]==0)
+        {cu++;
+            yc[i]=1;
+            av+=y[i];
+        }
+
+
+   }
+   ph[o]=av/cu;
+   }
+   int errr=0;
+   for(int i=0;i<len;i++)
+{
+    if(yc[i]==0)errr++;
 }
 
- short2byte2(&hh[0],&ne[0],40000);
-double av1=av*0.003845;//AvP(&ne[0],80);
- //for(int ii=0;ii<40000;ii++)cout<<(short)ne[ii]<<",  ";
-//cout<<n<<":"<<gaussian_sample(0, n)<<endl;
-if(1){
-kj=S_comp(&ne[0],com, 40000 ,4,round(sqrt(av*0.1)));
-co=kj;
+//cout<<"-notqpsk at:"<<v<<"-->"<<errr<<endl;
 
- kj=S_decomp((unsigned char *)&com[0], (unsigned char *)&com2[0], kj-1 ,4);
-
-sy2by(com2,(unsigned char *)com,8,0,kj);
+if(e!=0&&vi!=lim)M=-1;
+// cout<<e<<endl;
+return M;
 }
-else{
-   sy2by(ne,(unsigned char *)com,8,0,40000);
 
-}
-//cout<<c<<":";
-
- er+=BER((unsigned char *)com,data,10000);
- }
- cout<<co<<endl;
- }
-}
 
 int zstd_compress(const char* input, int inputSize)
 {
@@ -75,7 +186,79 @@ cout<<cSize<<endl;
     return cSize;
 }
 
+void conv(double *H, short *A, int N, int len)
+{cout<<"\n\n\n\n";
+    // Allocate enough space for convolution result
+    double *B = (double*)malloc((len + N - 1) * sizeof(double));
+    double c=0;
+    if (B == NULL) {
+        return;
+    }
+    for (int I = 0; I < len + N - 1; I++) {
+        B[I] = 0.0;
+        for (int i = 0; i < N; i++) {
+            int j = I - i;
+            if (j >= 0 && j < len) {
+                B[I] += A[j] * H[i];
+            }
+        }
+    }
+   //for(int i=0;i<1000+N;i++)cout<<B[i]<<",  ";
+//cout<<"\n\n\n\n";
+int p=((N-1)/2);
 
+for(int i=0;i<len;i++){A[i]=B[i+p];
+if(abs(B[i+p])>pow(2,15))exit(1);
+}
+}
+
+
+void cconv(double *H, comp *A, int N, int len)
+{cout<<"\n\n\n\n";
+    // Allocate enough space for convolution result
+    double *B = (double*)malloc((len + N - 1) * sizeof(double));
+       double *Bj = (double*)malloc((len + N - 1) * sizeof(double));
+    double c=0;
+    if (B == NULL) {
+        return;
+    }
+    for (int I = 0; I < len + N - 1; I++) {
+        B[I] = 0.0;
+        for (int i = 0; i < N; i++) {
+            int j = I - i;
+            if (j >= 0 && j < len) {
+                B[I] += A[j].i * H[i];
+                Bj[I] += A[j].Q * H[i];
+            }
+        }
+    }
+   //for(int i=0;i<1000+N;i++)cout<<B[i]<<",  ";
+//cout<<"\n\n\n\n";
+int p=((N-1)/2);
+for(int i=0;i<len;i++)A[i].i=B[i+p],A[i].Q=Bj[i+p];
+}
+
+
+int waever (comp* A,short *B,int len ,int N)
+{int r=1;
+    float I[N],Q[N];
+   for(int i=0;i<N;i++)
+   {I[i]=cos(M_PI*2*((float)i/N));
+    Q[i]=-sin(M_PI*2*((float)i/N));
+   }
+   float a=0,b=0;
+
+for(int i=0,ii=0;i<len;i++,ii++)
+{if(ii==N)ii=0;
+    a=A[i].i*I[ii];
+    b=A[i].Q*Q[ii];
+    B[i]=round(a+b);
+    if(abs(B[i])>127)r=-1;
+
+
+}
+return r;
+}
 
 int gzip(char *data, int len)
 {
@@ -149,9 +332,9 @@ void sine(comp * A,int len,int N,int S,float th)
 for(int i=0;i<len;i+=N){
     for(int I=0;I<N;I++)
 {
-  A[i+I].i=(short)(cos((2*M_PI*I/N)+th)*2048)/S;
+  A[i+I].i=(short)(cos((2*M_PI*((float)I/N))+th)*2048)/S;
 
-  A[i+I].Q=(short)(sin((2*M_PI*I/N)+th)*2048)/S ;
+  A[i+I].Q=(short)(-sin((2*M_PI*((float)I/N))+th)*2048)/S ;
 
    //printf("(0x%02X,0x%02X),  ",(int)(uint16_t) A[i+I].i,(int)(uint16_t) A[i+I].Q);
 //if(th!=1)cout<<(sqrt(pow(A[i+I].Q,2)+pow(A[i+I].i,2))*cos(atan2(A[i+I].Q,A[i+I].i)))<<",   ";
@@ -159,6 +342,30 @@ for(int i=0;i<len;i+=N){
 }//if(th!=1)exit(1);
 }
     return;
+}
+
+void sine1(comp * A,int len,int N,int S,float th,int flag)
+{
+for(int i=0;i<len;i+=N){
+    for(int I=0;I<N;I++)
+{
+    if(flag==1&&I==0){
+             A[i+I].i=(short)(cos((2*M_PI*((float)I/N))+th-0.785)*2048)/S;
+
+  A[i+I].Q=(short)(-sin((2*M_PI*((float)I/N))+th-0.785)*2048)/S ;
+
+}
+else
+{
+  A[i+I].i=(short)(cos((2*M_PI*((float)I/N))+th)*2048)/S;
+
+  A[i+I].Q=(short)(-sin((2*M_PI*((float)I/N))+th)*2048)/S ;
+
+}
+
+}
+    return;
+}
 }
 void ran(comp * A,int len,int N)
 {float th=((360/N)*3.141)/180;
@@ -176,51 +383,167 @@ for(int i=0;i<len;i+=4){
 
 void QPSk2(comp *Qpsk,unsigned char * data,int len ,int N)
 {float ph[4]={-2.356,-0.785,2.356,0.785};
-unsigned char a=0;
-    for(int i=0,q=q%4,m=0;i<len;i+=N,q++,m=q%4)
+
+unsigned char a=0,b=0, flag =0;
+    for(int i=0,q=0,m=0;i<len;i+=N,q++,m=q%4)
+   {flag=0;
+        if(m==0&&i!=0)
    {
-        if(q%4==0&&i!=0)
-   {
-    data ++;
+
+
+    data++;
 
    }
       a=(*data>>(m*2))&3;
+    if((b^a)==3)flag=0;
+b=a;
 
-  // *data=*data>>2;
 
-   sine(&Qpsk[i],N,N,4,ph[a]);
+   sine1(&Qpsk[i],N,N,4,ph[a],flag);
+   //i+=N,sine(&Qpsk[i],N,N,4,ph[a]);
+
+
+   }
+
+ return;
+}
+
+int phas2 (comp1 *A,int len,int m,int vi, float* ph)
+{
+    float  y[len],y2;
+int M=0,e=len,lim =round(90/m);
+
+
+char yc[len]={0};
+   for(int i=0;i<len;i++) y[i]=atan2(A[i].Q,A[i].i)*(180/M_PI);
+
+   for(int I=-1,o=0;o<m;o++){
+        for(int x=0;x<len;x++)
+        {
+            if(yc[x]==0)
+                {I=x,yc[x]=1;
+
+            break;}
+        }
+
+        if(I==-1){
+
+                break;
+        }
+int cu=0;
+float  av=0;
+y2=y[I];
+   for(int i=I+1;i<len;i++)
+   {
+      float j= (an_difference_deg(y2,y[i]));
+    // cout<<I<<"-"<<y[I]<<"|||"<<i<<"-"<<y[i]<<"/"<<(short)yc[i]<<"="<<j<<endl;
+      if(j<=vi&&yc[i]==0)
+        {cu++;
+    y2=(y2+y[i])/2;
+            yc[i]=1;
+            av+=y[i];
+        }
+
+
+   }
+   ph[o]=av/cu;
+   }
+   int errr=0;
+   for(int i=0;i<len;i++)
+{
+    if(yc[i]==0)errr++;
+}
+
+//cout<<"-notqpsk at:"<<v<<"-->"<<errr<<endl;
+
+if(e!=0&&vi!=lim)M=-1;
+// cout<<e<<endl;
+return M;
+}
+
+
+void BPSk(comp *psk,unsigned char * data,int len ,int N)
+{
+    float ph[2]={M_PI,0};
+unsigned char a=0;
+    for(int i=0,ii=0;ii<len;i++,ii+=N)
+   {
+        if(i==8)
+   {i=0;
+    data ++;
+   }
+      a=(*data>>i)&1;
+   sine(&psk[ii],N,N,4,ph[a]);
 
 
    }
  return;
 }
+
+
+int phas3 (comp1 *A,int len,int m, short* ph)
+{
+    short  y[len],y2;
+int M=0,e=len,lim =round(90/m);
+ short th[4]={0 ,90 ,-180 ,-90};
+char yc[len]={0};
+int  c=0,z=0,th2=0;
+   for(int i=0;i<len;i++) y[i]=atan2(A[i].Q,A[i].i)*(180/M_PI);
+
+   for(int t=0;t<90;t++,th[0]++,th[1]++,th[2]++,th[3]++)
+    {c=0;
+   for(int i=0;i<len;i++)
+   {
+            if( an_difference_deg2(th[0], y[i])<=23)c++;
+       else if( an_difference_deg2(th[1], y[i])<=23)c++;
+       else if( an_difference_deg2(th[2], y[i])<=23)c++;
+       else if( an_difference_deg2(th[3], y[i])<=23)c++;
+   }
+   if(c>z)z=c,th2=t;
+}
+int cu=(90-th2);
+ph[0]=th[0]-cu,ph[1]=th[1]-cu,ph[2]=th[2]-cu,ph[3]=th[3]-cu;
+return 1;
+
+}
+
 void Dpsk(comp *dpsk,unsigned char * data,int len ,int N)
 {
    float ph[2]={M_PI,0};
 unsigned char a=0,c=0;
 sine(&dpsk[0],N,N,4,ph[0]);
-for(int i=N,v=0;v<len;i++)
+a=data[0];
+for(int i=0,ii=0,iii=N;iii<len;ii++,iii+=N)
 {
-    a=data[i];
-for(int ii=0;ii<8;ii++,v+=N)
-{c=((a&1)^c);
-  sine(&dpsk[v],N,N,4,ph[c]);
-  a=a>>1;
-}
+if((a&1)==0)c=c^1;
+    cout<<"="<<(short)c<<"/"<<ph[c&1]<<endl;
+   if(c==1) sine(&dpsk[iii],N,N,4,ph[1]);
+  else sine(&dpsk[iii],N,N,4,ph[0]);
+
+  if(ii==7)i++,a=data[i],ii=-1;
+  else a=a>>1;
 
 
 }
 
- return;
+return;
+
 }
-void de_Dpsk(char *A,int len ,int N,unsigned char *d)
+
+
+
+void de_Dpsk(short *A,int len ,int N,unsigned char *d)
 {int a=0;
-
-    for(int i=0,x=0;i<len-N;i+=N,x++,x=x%N)
+d[0]=0;
+unsigned char b=0;
+    for(int i=0,x=0,c=0;i<len-N;i+=N,x++)
 {
-    a=0;
+    a=0,b=0;
  for(int ii=0;ii<N;ii++)a+=A[i+ii]*A[i+ii+N]  ;
- d[i]|=((a>0)<<x);
+ if(a>0)b=1;
+ cout<<a<<endl;
+ d[c]|=(b<<x);
+ if(x==7)x=0,c++,d[c]=0;
 
 }
 
@@ -350,6 +673,186 @@ ra=i;
 d-=N+1;
 return d;
 }
+int S_comp1(short *A, char *B, int len ,int N, int v)
+{char en[len];
+unsigned char s=0,ch=0;
+int comp =0,d=0,g=0,ra=0;
+std::fill(en, en+len, 1);
+
+   for(int i=0; i<=len ;i+=N)
+   {int f=1;
+
+   g=(N*255);//128 blocks *N
+   bbb:
+if(len-i<=(255*N))ch=1,g=len-i;// max len limit check
+
+      if(en[i]==0){i+=N;// already compresed skip
+      goto bbb;
+      }
+unsigned char cc=1;
+    for(int c=N;c<g&&f==1;c+=N,cc++)//cc is block ID
+    {//cout<<cc<<"   ";
+
+       // if (i + c + N > len) break;
+       if(abs(A[i]-A[i+c])<=v&&en[i+c]==1)
+
+            {//cout<<(int)A[i]<<"=="<<(int)A[i+c]<<endl;
+                int t=1;
+               // cout<<"1:"<<i<<endl;
+
+       for(int h=1;h<N;h++)
+       {//cout<<(int)A[i+h]<<"=="<<(int)A[i+c+h]<<endl;
+
+           if(abs(A[i+h]-A[i+c+h])>v)
+           {
+               t=7;
+               break;
+           }
+         //  if(i>1007&&cout<<(int)A[i+h]<<"=="<<(int)A[i+c+h]<<endl;
+       }
+       //cout<<endl;
+         if(t<2)   {comp++;
+                en[i+c]=0;
+ra++;
+
+ //asm("shl %1,%0" : "+r"(cc) : "cI"((unsigned char)1));
+s=cc;
+
+//cout<<endl<<(s>>1)<<endl;
+            f=0;
+
+         }
+       }
+
+    }
+
+*B=s;
+B++;
+if(s==0){
+for(int I=0;I<N;I++){
+  ((short*)B)[0]=A[i+I];
+
+B+=2;
+//putting the block in the new array
+
+
+}}else
+{ //cout<<i<<endl;
+    for(int I=0;I<N;I++)
+        {
+short avg_i = (short)((A[i+I] + A[i+I+(s*N)]) / 2);
+memcpy(&B[0], &avg_i, sizeof(short));
+
+B+=2;
+
+
+
+
+}
+
+}
+    d+=((N*2)+1);
+
+s=0;
+ra=i;
+   }
+//cout<<(float)(ra*N)/len;
+
+return d;
+}
+
+int S_comp2(comp *A, char *B, int len ,int N, int v)
+{char en[len];
+unsigned char s=0,ch=0;
+int comp =0,d=0,g=0,ra=0;
+std::fill(en, en+len, 1);
+
+   for(int i=0; i<=len ;i+=N)
+   {int f=1;
+
+   g=(N*255);//128 blocks *N
+   bbb:
+if(len-i<=(255*N))ch=1,g=len-i;// max len limit check
+
+      if(en[i]==0){i+=N;// already compresed skip
+      goto bbb;
+      }
+unsigned char cc=1;
+    for(int c=N;c<g&&f==1;c+=N,cc++)//cc is block ID
+    {//cout<<cc<<"   ";
+
+       // if (i + c + N > len) break;
+       if(abs(A[i].i-A[i+c].i)<=v&&abs(A[i].Q-A[i+c].Q)<=v&&en[i+c]==1)
+
+            {//cout<<(int)A[i]<<"=="<<(int)A[i+c]<<endl;
+                int t=1;
+               // cout<<"1:"<<i<<endl;
+
+       for(int h=1;h<N;h++)
+       {//cout<<(int)A[i+h]<<"=="<<(int)A[i+c+h]<<endl;
+
+           if(abs(A[i+h].i-A[i+c+h].i)>v||abs(A[i+h].Q-A[i+c+h].Q)>v)
+           {
+               t=7;
+               break;
+           }
+         //  if(i>1007&&cout<<(int)A[i+h]<<"=="<<(int)A[i+c+h]<<endl;
+       }
+       //cout<<endl;
+         if(t<2)   {comp++;
+                en[i+c]=0;
+ra++;
+
+ //asm("shl %1,%0" : "+r"(cc) : "cI"((unsigned char)1));
+s=cc;
+
+//cout<<endl<<(s>>1)<<endl;
+            f=0;
+
+         }
+       }
+
+    }
+
+*B=s;
+B++;
+if(s==0){
+for(int I=0;I<N;I++){
+  ((short*)B)[0]=A[i+I].i;
+
+((short*)B)[1]=A[i+I].Q;
+B+=4;
+//putting the block in the new array
+
+
+}}else
+{ //cout<<i<<endl;
+    for(int I=0;I<N;I++)
+        {
+short avg_i = (short)((A[i+I].i + A[i+I+(s*N)].i) / 2);
+short avg_q = (short)((A[i+I].Q + A[i+I+(s*N)].Q) / 2);
+
+// Copy safely to the char buffer B
+memcpy(&B[0], &avg_i, sizeof(short));
+memcpy(&B[2], &avg_q, sizeof(short));
+B+=4;
+
+
+
+
+}
+
+}
+    d+=((N*4)+1);
+
+s=0;
+ra=i;
+   }
+//cout<<(float)(ra*N)/len;
+
+return d;
+}
+
 
 
 int S_decomp(unsigned char *A,unsigned  char *B, int len ,int N)
@@ -379,6 +882,94 @@ en[ii+(a*N)]=0;
          for(int c=0;c<N;c++)
       {
        B[ii+c+(a*N)]=A[i+c+1]  ;
+      }
+
+      }
+
+}
+//cout<<endl<<ra<<endl;
+return ii;
+}
+
+int S_decomp1(short *A,char *B, int len ,int N)
+{char *en=(char*)malloc(len*2 * sizeof(char));
+int ii=0,ra=0;
+std::fill(en, en+(len*2), 1);
+
+for(int i=0;i<len;i+=(N*2)+1,ii+=N)
+{//cout<<i<<"  ";
+    fff:
+  if(en[ii]==0){
+
+    ii+=N;
+    goto fff;
+  }
+  unsigned char f=*B;
+  B++;
+      for(int c=0;c<N;c++)
+      {
+       A[ii+c]=((short*)B)[0]  ;
+
+       B+=2;
+      }
+
+      if(f!=0)
+      {
+     // asm("shr %1,%0" : "+r"(a) : "cI"((unsigned char)1));
+ra++;
+en[ii+(f*N)]=0;
+B-=(N*2);
+//cout<<(A[i]>>1)<<"   ";
+         for(int c=0;c<N;c++)
+      {
+       A[ii+c+(f*N)]=((short*)B)[0]  ;
+      B+=2;
+
+      }
+
+      }
+
+}
+//cout<<endl<<ra<<endl;
+return ii;
+}
+
+
+int S_decomp2(comp *A,char *B, int len ,int N)
+{char *en=(char*)malloc(len*2 * sizeof(char));
+int ii=0,ra=0;
+std::fill(en, en+(len*2), 1);
+
+for(int i=0;i<len;i+=(N*4)+1,ii+=N)
+{//cout<<i<<"  ";
+    fff:
+  if(en[ii]==0){
+
+    ii+=N;
+    goto fff;
+  }
+  unsigned char f=*B;
+  B++;
+      for(int c=0;c<N;c++)
+      {
+       A[ii+c].i=((short*)B)[0]  ;
+       A[ii+c].Q=((short*)B)[1]  ;
+       B+=4;
+      }
+
+      if(f!=0)
+      {
+     // asm("shr %1,%0" : "+r"(a) : "cI"((unsigned char)1));
+ra++;
+en[ii+(f*N)]=0;
+B-=(N*4);
+//cout<<(A[i]>>1)<<"   ";
+         for(int c=0;c<N;c++)
+      {
+       A[ii+c+(f*N)].i=((short*)B)[0]  ;
+       A[ii+c+(f*N)].Q=((short*)B)[1]  ;
+       B+=4;
+
       }
 
       }
@@ -479,6 +1070,32 @@ double subtract_angles(double a, double b) {
     return normalize_angle(a - b);
 }
 
+/*double an_difference_deg(double a, double b) {
+    double diff = fabs(a - b);
+    // Use 360.0 instead of 2*M_PI
+    diff = fmod(diff, 360.0);
+    if (diff > 180.0) {
+        diff = 360.0 - diff;
+    }
+    return diff;
+}*/
+short an_difference_deg(short a, short b) {
+    int diff = (int)a - (int)b;  // Prevent short overflow
+    diff = (diff + 180) % 360 - 180;
+    if (diff < -180) diff += 360;
+    return (short)diff;
+}
+
+ short an_difference_deg2(short a, short b)
+{
+    short d = a - b;
+
+    if (d < -180) d += 360;
+    else if (d > 180) d -= 360;
+
+    return (d < 0) ? -d : d;
+}
+
 double an_difference(double theta1, double theta2) {
     double diff = fabs(theta1 - theta2);
     diff = fmod(diff, 2.0 * M_PI);
@@ -501,8 +1118,31 @@ template <typename t> float demod(t *A ,int N)
        b+=(float)Q[i]*A[i];
 
    }
+   //cout<<"("<<a/N<<","<<b/N<<")"<<",   ";
    return atan2(-b,a);
 }
+template float demod <short>(short*, int);
+template <typename t> float demod1(t *A ,int N,float th)
+{
+   float I[N],Q[N];
+   for(int i=0;i<N;i++)
+   {I[i]=cos(M_PI*2*((float)i/N));
+    Q[i]=sin(M_PI*2*((float)i/N));
+   }
+   float a=0,b=0;
+   for(int i=0;i<N;i++)
+   {
+       a+=(float)I[i]*A[i];
+       b+=(float)Q[i]*A[i];
+
+   }
+   float a2=(a*cos(th))-(b*sin(th));
+    float b2=(a*sin(th))+(b*cos(th));
+   cout<<"("<<a2/N<<","<<b2/N<<")"<<",   ";
+   return atan2(-b,a);
+}
+template float demod1 <short>(short*, int,float);
+template float demod1 <char>(char*, int,float);
 float PO(char *A ,int N )
 {
    float I=0,Q=0;
@@ -539,12 +1179,37 @@ char deQPSK(char *A ,int N, float th )
 
 }
 
+char deQPSK2(short *A ,int N, float th )
+{
+   float I[N],Q[N];
+   for(int i=0;i<N;i++)
+   {I[i]=cos(M_PI*2*((float)i/N)-th);
+    Q[i]=-sin(M_PI*2*((float)i/N)-th);
+   }
+   double a=0,b=0;
+   for(int i=0;i<N;i++)
+   {
+       a+=(float)I[i]*A[i];
+       b+=(float)Q[i]*A[i];
+
+   }
+
+
+    unsigned char c=0;
+    if(a>0)c|=1;
+    if(b>0)c|=2;
+//cout<<"_"<<atan2(b,a)*(180/M_PI)<<",    ";
+    return c;
+
+}
+
 int Max(short *a,int len)
 {
     short b=0;
     for(int i=0;i<len;i++){
             if(abs(a[i])>b)b=abs(a[i]);
     }
+
     return b;
 }
 
@@ -561,12 +1226,54 @@ int sy2by(char *A,unsigned char *B,int N,float th,int len)
  return i;
 
 }
+int sy2by2(short *A,unsigned char *B,int N,float th,int len)
+{int i=0;
+
+ for(int I=0;I<len;i++)
+   {B[i]=0;
+     for(int ii=0;ii<8&&I<len;ii+=2,I+=N)
+       {
+        B[i]|= (deQPSK2(&A[I],N,th)<<ii);
+        //cout<<(short)B[i]<<"  ";
+
+       }
+      // if(i==2)exit(1);
+   }
+ return i;
+
+}
+void depsk(short *A,unsigned char *B,int N,float th,int len)
+{float I[N];
+for(int i=0;i<N;i++)
+{
+  I[i]= cos(2.0 * M_PI * ((double)i / N) + th);
+}
+ int r=len/N;
+
+ float s=0;
+ B[0]=0;
+ for(int x=0,m=0,n=0;x<len;x+=N,m++)
+ {s=0;
+     for(int i=0;i<N;i++)
+     {
+       s+=I[i]*A[i+x];
+     }
+     if(m==8)m=0,n++,B[n]=0;
+     //cout<<s<<"  ";
+     unsigned char g=0;
+     if(s>=0)g=1;
+
+     B[n]|=(g<<m);
+
+ }
+}
 
 double BER(unsigned char *A,unsigned char *B, int l)
 {double e=0;
 
     for(int i=0,ii=0;i<l;ii++)
-    {char a=A[ii],b=B[ii];
+    {unsigned char a=A[ii],b=B[ii];
+    //cout<<(short)A[ii]<<"=="<<(short)B[ii]<<"   ";
       for(int I=0;I<8&&i<l;I++,i++)
       {if((a&1)!=(b&1))e++;
          a=a>>1,b=b>>1;
@@ -583,7 +1290,7 @@ int short2byte(short *A, char* B,int len)
 
   for(int i=0;i<len;i++)
   {
-    c= ( float)A[i]*(127/m) ;
+    c= ( float)A[i]*((float)127/m) ;
     //c=A[i];
    B[i]=(signed char)c;
 
@@ -637,26 +1344,26 @@ float er(float a)
     return t;
 }
 
-float chint(char *A,int N,int f){
-float a,b;
+float chint(short *A,int N,int f){
+float a=0,b=0;
 
 for(int i=0;i<N;i++){
   a+=cos(M_PI*f*2*((float)i/N))*A[i];
     b+=-sin(M_PI*f*2*((float)i/N))*A[i];
 
-}
+}a/=N,b/=N;
 //cout<<"::::"<<sqrt(pow(a/8,2)+pow(b/8,2))<<"<<<<<<<<";
 return  sqrt(pow(a/N,2)+pow(b/N,2));
 }
 
-void cor(char *A,comp *c,int N,int len){
+void cor(short *A,comp *c,int N,int len){
     float I[N],Q[N];
     for(int i=0;i<N;i++)
     {
         I[i]=cos(M_PI*2*((float)i/N));
         Q[i]=-sin(M_PI*2*((float)i/N));
     }
-    for(int ii=0,v=0;ii<len;ii++,v+=8){
+    for(int ii=0,v=0;ii<len;ii++,v+=N){
 float a=0,b=0;
 for(int i=0;i<N;i++)
     {
@@ -678,7 +1385,7 @@ int com2re(comp *A,short *B, int len)
 int g=0;
  for(int i=0,k=0;i<len;i++){
 //cout<<A[i].i<<"="<<A[i].Q<<endl;
-        if(sqrt(pow(A[i].i,2)+pow(A[i].Q,2))>0x12&&k==0)
+        if(sqrt(pow(A[i].i,2)+pow(A[i].Q,2))>0x30&&k==0)
  {
     // if(chint(&A[i],8,1)>chint(&A[i],8,2))
         k=1;
@@ -735,12 +1442,23 @@ int g=0;
 return g;
 }
 
+int com2im(comp *A,short *B, int len)
+{
+int g=0;
+ for(int i=0,k=0;i<len;i++)
+{
+       B[g]=(short)A[i].Q,g++;
+}
+
+return g;
+}
+
 float cal(char *B1,int N,float ph)
 {
    return atan2f(sinf(ph - demod<char>(&B1[0],N)), cosf(ph - demod<char>(&B1[0],N)));
 }
 
-int ana(char * B1,int l,float g,float *th)
+int ana(short * B1,int l,float g,float *th)
 {
 
 //if(g==0)th=atan2f(sinf(0.785 - demod<char>(&B1[16],8)), cosf(0.785 - demod<char>(&B1[16],8)));
@@ -771,10 +1489,12 @@ if(z>t)z=t,m=i;
 */
 //cout<<">>>"<<m<<":"<<demod< char>(&B1[m],8)<<endl;
 //m=1;/////////////////////////xxxxxxxx
+
 float mi=99999;
+
 for(int i=0;i<8;i++){
-comp f[1000];
-cor(&B1[i],f,8,1000);
+comp *f=(comp*)malloc(1000 * sizeof(comp));
+cor(&B1[i],f,16,400);
 float gr[5],mean=0;
 computeKMeansAngles(f,100,gr,4);
 sort(gr,gr+4);
@@ -784,25 +1504,26 @@ mean+=abs(subtract_angles(an_difference(gr[2],gr[3]),1.57079));
 mean+=abs(subtract_angles(an_difference(gr[0],gr[3]),1.57079));
 if(mean<mi)mi=mean,m=i;
 //cout<<i<<":"<<mean*(180/M_PI)/4<<endl;
-//for(int i =0;i<4;i++)cout<<gr[i]*(180/M_PI)<<":"<<endl;
-
-}
-
-//m=1;
-if(g==0)*th=atan2f(sinf(-2.3561944 - demod<char>(&B1[8+m],8)), cosf(-2.3561944 - demod<char>(&B1[8+m],8)));
+for(int i =0;i<4;i++)cout<<gr[i]*(180/M_PI)<<":"<<endl;
+cout<<endl;
+}exit(1);
+cout<<m;
+//m=16;
+//if(g==0)*th=atan2f(sinf(-2.3561944 - demod<char>(&B1[8+m],8)), cosf(-2.3561944 - demod<char>(&B1[8+m],8)));
 
 //exit(1);
 
 //cout<<"at :"<<m;
 
  // cout<<*th*(180/M_PI)<<endl;
+ cout<<endl;
 for(int i=m;i<l/8;i+=8)
 {//i-=(int)(er(demod(&B[i],8))/1.57)*4;
 
 //cout<<subtract_angles((demod<char>(&B1[i],8)),-*th)*(180/M_PI)<<"   ";
 //cout<<demod<char>(&B1[i],8)*(180/M_PI)<<"   ";
 }
-
+//exit(1);
 return m;
 }
 
@@ -1401,11 +2122,11 @@ da=da+" 00000003 CYCLIC\r\n";
 
 
     }
-    if (g < 0) e++;
+    else e++;
 
     if(e>100){ int wsa_error = WSAGetLastError();
     printf("WSA Error: %d\n", wsa_error);
-            return -1;}
+            return m;}
   }while(g<1||m<bufsize);
 
   return m;
