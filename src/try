@@ -1,0 +1,50 @@
+#include <arm_neon.h>
+#include <vector>
+
+void conv_neon(const float *H, const float *A, short *output_A, int N, int len) {
+    int total_len = len + N - 1;
+    std::vector<float> B(total_len, 0.0f);
+
+    for (int I = 0; I < total_len; I++) {
+        float32x4_t sum_vec = vdupq_n_f32(0.0f); // Initialize 4-lane accumulator
+        int i = 0;
+
+        // Process 4 taps at a time
+        for (; i <= N - 4; i += 4) {
+            int j = I - i;
+            
+            // Check boundaries for the block of 4
+            if (j - 3 >= 0 && j < len) {
+                // Load 4 taps: H[i], H[i+1], H[i+2], H[i+3]
+                float32x4_t h_vec = vld1q_f32(&H[i]);
+
+                // Load 4 signal samples (Backwards because of convolution index j = I - i)
+                // Note: For true speed, pre-reverse your Taps (H) so you can load signal samples forward.
+                float s_vals[4] = {A[j], A[j-1], A[j-2], A[j-3]};
+                float32x4_t s_vec = vld1q_f32(s_vals);
+
+                // Multiply and Accumulate: sum = sum + (h * s)
+                sum_vec = vmlaq_f32(sum_vec, h_vec, s_vec);
+            }
+        }
+
+        // Horizontal sum of the 4 lanes
+        float res = vgetq_lane_f32(sum_vec, 0) + vgetq_lane_f32(sum_vec, 1) +
+                    vgetq_lane_f32(sum_vec, 2) + vgetq_lane_f32(sum_vec, 3);
+
+        // Clean up remaining taps (if N is not a multiple of 4)
+        for (; i < N; i++) {
+            int j = I - i;
+            if (j >= 0 && j < len) {
+                res += A[j] * H[i];
+            }
+        }
+        B[I] = res;
+    }
+
+    // Copy back to A with your p offset
+    int p = (N - 1) / 2;
+    for (int i = 0; i < len; i++) {
+        output_A[i] = (short)B[i + p];
+    }
+}
