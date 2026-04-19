@@ -147,11 +147,12 @@ while(1){
     int o=0;
        do{ int i=recv(client_socket,&buff[o],le-o,0);
         if(i>0)o+=i;
-        cout<<"d";
+        
        }while(o<le);
+       c
 //if(le <0|| le>40000)le=20000;
     //std::cout<<o<<":"<<le<<":"<<S_decomp((unsigned char *)buff,(unsigned char *)buff2,o,8)<<std::endl;
-       for(int i=0;i<10000;i++)cout<<(short)buff[i]<<",   ";
+    //   for(int i=0;i<le;i++)cout<<(short)buff[i]<<",   ";
       // for(int i=0;i<le;i+=2)cout<<atan2(buff2[i+1],buff2[i])*(180/M_PI);
 int pream=32,block =200,snr=16,ree=1;
        complex<double> f3[60000];
@@ -206,7 +207,7 @@ cout<<ph[3]<<endl;
 th2*=(M_PI/180);
 float co_s=cos(-th2);
 float si_n=sin(-th2);
-for(int i=0;i<40000/8;i++){
+for(int i=0;i<le/2;i++){
      //  cout<<((subtract_angles(atan2(f3[i].Q,f3[i].i),-th2))*(180/M_PI))<<",   ";
 short x=f3[i].real()*co_s-f3[i].imag()*si_n;
 short y =f3[i].real()*si_n+f3[i].imag()*co_s;
@@ -214,7 +215,7 @@ short y =f3[i].real()*si_n+f3[i].imag()*co_s;
 f3[i]=std::complex<double>(x,y);
 cout<<"("<<x<<","<<y<<")"<<",   ";
 }
-for(int i=0, d=0; i < 5000; i += 4, d++)
+for(int i=0, d=0; i < le/2; i += 4, d++)
 {
     unsigned char da = 0;
     for(int j=0; j<4; j++) {
@@ -227,7 +228,7 @@ for(int i=0, d=0; i < 5000; i += 4, d++)
 }
     //   ana(buff2,o);
 
-        exit(1);
+
 }
 
             std::cout << "Client connected!" << std::endl;
