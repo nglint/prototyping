@@ -1,0 +1,267 @@
+#include <iostream>
+#include <string>
+#include <winsock2.h>
+#include <math.h>
+#include <ws2tcpip.h>
+#include <complex>
+#define M_PI 3.14159265358979323846
+using namespace std ;
+#pragma comment(lib, "ws2_32.lib")
+short an_difference_deg2(short a, short b)
+{
+    short d = a - b;
+
+    if (d < -180) d += 360;
+    else if (d > 180) d -= 360;
+
+    return (d < 0) ? -d : d;
+}
+double an_difference(double theta1, double theta2) {
+    double diff = fabs(theta1 - theta2);
+    diff = fmod(diff, 2.0 * M_PI);
+    if (diff > M_PI) {
+        diff = 2.0 * M_PI - diff;
+    }
+    return diff;
+}
+short an_difference_deg(short a, short b) {
+    int diff = (int)a - (int)b;  // Prevent short overflow
+    diff = (diff + 180) % 360 - 180;
+    if (diff < -180) diff += 360;
+    return (short)diff;
+}
+template <typename t> float demod(t *A ,int N)
+{
+   float I[N],Q[N];
+   for(int i=0;i<N;i++)
+   {I[i]=cos(M_PI*2*((float)i/N));
+    Q[i]=sin(M_PI*2*((float)i/N));
+   }
+   float a=0,b=0;
+   for(int i=0;i<N;i++)
+   {
+       a+=(float)I[i]*A[i];
+       b+=(float)Q[i]*A[i];
+
+   }
+   return atan2(-b,a);
+}
+
+
+float er(float a)
+{float g[4]={0.785,-2.356,-0.785,2.356};
+    float t=30;
+
+    for(int i=0;i<2;i++)
+    {
+       if(t> an_difference(g[i],a)) t=an_difference(g[i],a);
+    }
+    return t;
+}
+
+double normalize_angle(double theta) {
+    theta = fmod(theta + M_PI, 2 * M_PI);
+    if (theta < 0) {
+        theta += 2 * M_PI;
+    }
+    return theta - M_PI;
+}
+
+double subtract_angles(double a, double b) {
+    return normalize_angle(a - b);
+}
+
+class WinsockTCPServer {
+private:
+    SOCKET server_socket;
+    SOCKET client_socket;
+    sockaddr_in server_addr;
+    const int PORT = 8000;
+    WSADATA wsa_data;
+
+public:
+    WinsockTCPServer() : server_socket(INVALID_SOCKET), client_socket(INVALID_SOCKET) {}
+
+    bool initialize() {
+        // Initialize Winsock
+        int result = WSAStartup(MAKEWORD(2, 2), &wsa_data);
+        if (result != 0) {
+            std::cerr << "WSAStartup failed: " << result << std::endl;
+            return false;
+        }
+
+        // Create socket
+        server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (server_socket == INVALID_SOCKET) {
+            std::cerr << "Socket creation failed: " << WSAGetLastError() << std::endl;
+            WSACleanup();
+            return false;
+        }
+
+        // Setup server address
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_addr.s_addr = INADDR_ANY;
+        server_addr.sin_port = htons(PORT);
+
+        // Bind socket
+        if (bind(server_socket, (sockaddr*)&server_addr, sizeof(server_addr)) == SOCKET_ERROR) {
+            std::cerr << "Bind failed: " << WSAGetLastError() << std::endl;
+            closesocket(server_socket);
+            WSACleanup();
+            return false;
+        }
+
+        // Listen for connections
+        if (listen(server_socket, SOMAXCONN) == SOCKET_ERROR) {
+            std::cerr << "Listen failed: " << WSAGetLastError() << std::endl;
+            closesocket(server_socket);
+            WSACleanup();
+            return false;
+        }
+
+        std::cout << "Server listening on port " << PORT << std::endl;
+        return true;
+    }
+
+
+
+    void start() {
+        if (!initialize()) {
+            return;
+        }
+
+        std::cout << "Waiting for connections..." << std::endl;
+
+        while (true) {
+            // Accept client connection
+            client_socket = accept(server_socket, NULL, NULL);
+            if (client_socket == INVALID_SOCKET) {
+                std::cerr << "Accept failed: " << WSAGetLastError() << std::endl;
+                continue;
+            }
+            cout<<"kn;kln[";
+char buff[100000],buff2[100000] ;
+int le;
+char *le2=(char*)&le;
+while(1){
+    recv(client_socket,le2,4,0);
+    send(client_socket,"ok12",4,0);
+    //if(errno==ECNNRESET||errno==EPIPE||errno==ETIMEDOUT)
+    cout<<"buff lentgh is :"<<le<<endl;
+    int o=0;
+       do{ int i=recv(client_socket,&buff[o],le-o,0);
+        if(i>0)o+=i;
+        cout<<"d";
+       }while(o<le);
+//if(le <0|| le>40000)le=20000;
+    //std::cout<<o<<":"<<le<<":"<<S_decomp((unsigned char *)buff,(unsigned char *)buff2,o,8)<<std::endl;
+       for(int i=0;i<10000;i++)cout<<(short)buff[i]<<",   ";
+      // for(int i=0;i<le;i+=2)cout<<atan2(buff2[i+1],buff2[i])*(180/M_PI);
+int pream=32,block =200,snr=16,ree=1;
+       complex<double> f3[60000];
+        for(int i=0,ii=0;i<le;i++,ii+=2)f3[i]=std::complex<double>(buff[ii],buff[ii+1]);
+std::complex<double > me=std::complex<double>(0,0);
+
+for(int i = pream; i < pream+block; i++) {
+
+    std::complex<double > temp = f3[i] * f3[i]; // z^2
+    me +=( temp * temp) ;                     // z^4
+
+}
+me/=block;
+short ph[4];
+ph[0]=round((0.25 *atan2(me.imag(),me.real()))*(180/M_PI));
+//cout<<"Ph[0]="<<ph[0]<<endl;
+if(ph[0]<0)ph[0]+=90;
+//cout<<"after Ph[0]="<<ph[0]<<endl;
+//
+ph[1] =ph[0]+90;
+    ph[1] = (ph[1] + 180) % 360 - 180;
+    ph[2] =ph[1]+90;
+    ph[2] = (ph[2] + 180) % 360 - 180;
+    ph[3] =ph[2]+90;
+    ph[3] = (ph[3] + 180) % 360 - 180;
+
+//phas3 (&f3[1],200,4,ph);
+
+
+std::complex<double>  zz=std::complex<double>(0,0);
+for(int i=0;i<pream;i++)zz+=f3[i];
+//cout<<zz<<"  ";
+
+short x=atan2(zz.imag(),zz.real())*(180/M_PI);
+int o2=-1;
+
+for (int i =0;i<4;i++){
+   if( an_difference_deg2(ph[i],x)<=45 )o2=i;
+}//cout<<"O is :"<<o<<endl;
+   float th2=an_difference_deg(ph[o2],-135);
+
+th2;
+
+cout<<ph[0]<<endl;
+cout<<ph[1]<<endl;
+cout<<ph[2]<<endl;
+cout<<ph[3]<<endl;
+
+//float th2=atan2f(sinf(-2.3561944 -ph[0]), cosf(-2.3561944 - ph[0]));
+//cout<<"pahse is :"<<th2<<endl;
+//cout<<"x :"<<x<<endl;
+th2*=(M_PI/180);
+float co_s=cos(-th2);
+float si_n=sin(-th2);
+for(int i=0;i<40000/8;i++){
+     //  cout<<((subtract_angles(atan2(f3[i].Q,f3[i].i),-th2))*(180/M_PI))<<",   ";
+short x=f3[i].real()*co_s-f3[i].imag()*si_n;
+short y =f3[i].real()*si_n+f3[i].imag()*co_s;
+
+f3[i]=std::complex<signed char>(x,y);
+cout<<"("<<x<<","<<y<<")"<<",   ";
+}
+for(int i=0, d=0; i < 5000; i += 4, d++)
+{
+    unsigned char da = 0;
+    for(int j=0; j<4; j++) {
+        unsigned char d2 = 0;
+        if(f3[i+j].imag() > 0) d2 |= 1;
+        if(f3[i+j].real() > 0) d2 |= 2;
+        da |= (d2 << (2 * j));
+    }
+
+}
+    //   ana(buff2,o);
+
+        exit(1);
+}
+
+            std::cout << "Client connected!" << std::endl;
+
+        }
+
+        cleanup();
+    }
+
+    void cleanup() {
+        if (client_socket != INVALID_SOCKET) {
+            closesocket(client_socket);
+        }
+        if (server_socket != INVALID_SOCKET) {
+            closesocket(server_socket);
+        }
+        WSACleanup();
+    }
+
+    ~WinsockTCPServer() {
+        cleanup();
+    }
+};
+
+int main() {
+short a[8]={ 313,   1297,   1788,   1138,   -262,   -1449,   -1835,   -1054};
+//164 -13.7 -94
+cout<<demod<short>(a,8)*(180/M_PI)<<endl;
+float angle2=-0.1,angle1=0.1;
+    WinsockTCPServer server;
+    server.start();
+    return 0;
+}
