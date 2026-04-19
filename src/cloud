@@ -1,8 +1,10 @@
 #include <iostream>
 #include <string>
-#include <winsock2.h>
+#include <sys/select.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <netinet/in.h>
 #include <math.h>
-#include <ws2tcpip.h>
 #include <complex>
 #define M_PI 3.14159265358979323846
 using namespace std ;
@@ -73,28 +75,23 @@ double subtract_angles(double a, double b) {
 
 class WinsockTCPServer {
 private:
-    SOCKET server_socket;
-    SOCKET client_socket;
+    int server_socket;
+    int client_socket;
     sockaddr_in server_addr;
     const int PORT = 8000;
-    WSADATA wsa_data;
+
 
 public:
-    WinsockTCPServer() : server_socket(INVALID_SOCKET), client_socket(INVALID_SOCKET) {}
+    WinsockTCPServer() : server_socket(-1), client_socket(-1) {}
 
     bool initialize() {
         // Initialize Winsock
-        int result = WSAStartup(MAKEWORD(2, 2), &wsa_data);
-        if (result != 0) {
-            std::cerr << "WSAStartup failed: " << result << std::endl;
-            return false;
-        }
 
         // Create socket
         server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-        if (server_socket == INVALID_SOCKET) {
-            std::cerr << "Socket creation failed: " << WSAGetLastError() << std::endl;
-            WSACleanup();
+        if (server_socket <0) {
+            std::cerr << "Socket creation failed: " << std::endl;
+
             return false;
         }
 
@@ -104,18 +101,17 @@ public:
         server_addr.sin_port = htons(PORT);
 
         // Bind socket
-        if (bind(server_socket, (sockaddr*)&server_addr, sizeof(server_addr)) == SOCKET_ERROR) {
-            std::cerr << "Bind failed: " << WSAGetLastError() << std::endl;
-            closesocket(server_socket);
-            WSACleanup();
+        if (bind(server_socket, (sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+            std::cerr << "Bind failed: " << std::endl;
+            close(server_socket);
+
             return false;
         }
 
         // Listen for connections
-        if (listen(server_socket, SOMAXCONN) == SOCKET_ERROR) {
-            std::cerr << "Listen failed: " << WSAGetLastError() << std::endl;
-            closesocket(server_socket);
-            WSACleanup();
+        if (listen(server_socket, SOMAXCONN) <-1) {
+            std::cerr << "Listen failed: " << std::endl;
+            close(server_socket);
             return false;
         }
 
@@ -135,14 +131,14 @@ public:
         while (true) {
             // Accept client connection
             client_socket = accept(server_socket, NULL, NULL);
-            if (client_socket == INVALID_SOCKET) {
-                std::cerr << "Accept failed: " << WSAGetLastError() << std::endl;
+            if (client_socket  < -1) {
+                std::cerr << "Accept failed: " << std::endl;
                 continue;
             }
             cout<<"kn;kln[";
-char buff[100000],buff2[100000] ;
+signed char buff[100000],buff2[100000] ;
 int le;
-char *le2=(char*)&le;
+signed char *le2=(signed char*)&le;
 while(1){
     recv(client_socket,le2,4,0);
     send(client_socket,"ok12",4,0);
@@ -215,7 +211,7 @@ for(int i=0;i<40000/8;i++){
 short x=f3[i].real()*co_s-f3[i].imag()*si_n;
 short y =f3[i].real()*si_n+f3[i].imag()*co_s;
 
-f3[i]=std::complex<signed char>(x,y);
+f3[i]=std::complex<double>(x,y);
 cout<<"("<<x<<","<<y<<")"<<",   ";
 }
 for(int i=0, d=0; i < 5000; i += 4, d++)
@@ -238,22 +234,20 @@ for(int i=0, d=0; i < 5000; i += 4, d++)
 
         }
 
-        cleanup();
+
     }
 
     void cleanup() {
-        if (client_socket != INVALID_SOCKET) {
-            closesocket(client_socket);
+        if (client_socket > -1) {
+            close(client_socket);
         }
-        if (server_socket != INVALID_SOCKET) {
-            closesocket(server_socket);
+        if (server_socket > -1) {
+            close(server_socket);
         }
-        WSACleanup();
+
     }
 
-    ~WinsockTCPServer() {
-        cleanup();
-    }
+
 };
 
 int main() {
