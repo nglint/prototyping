@@ -147,15 +147,16 @@ while(1){
     int o=0;
        do{ int i=recv(client_socket,&buff[o],le-o,0);
         if(i>0)o+=i;
-        
+
        }while(o<le);
-       c
+
 //if(le <0|| le>40000)le=20000;
     //std::cout<<o<<":"<<le<<":"<<S_decomp((unsigned char *)buff,(unsigned char *)buff2,o,8)<<std::endl;
     //   for(int i=0;i<le;i++)cout<<(short)buff[i]<<",   ";
       // for(int i=0;i<le;i+=2)cout<<atan2(buff2[i+1],buff2[i])*(180/M_PI);
 int pream=32,block =200,snr=16,ree=1;
        complex<double> f3[60000];
+       auto s = chrono::steady_clock::now();
         for(int i=0,ii=0;i<le;i++,ii+=2)f3[i]=std::complex<double>(buff[ii],buff[ii+1]);
 std::complex<double > me=std::complex<double>(0,0);
 
@@ -191,15 +192,11 @@ int o2=-1;
 
 for (int i =0;i<4;i++){
    if( an_difference_deg2(ph[i],x)<=45 )o2=i;
-}//cout<<"O is :"<<o<<endl;
+}
    float th2=an_difference_deg(ph[o2],-135);
 
 th2;
 
-cout<<ph[0]<<endl;
-cout<<ph[1]<<endl;
-cout<<ph[2]<<endl;
-cout<<ph[3]<<endl;
 
 //float th2=atan2f(sinf(-2.3561944 -ph[0]), cosf(-2.3561944 - ph[0]));
 //cout<<"pahse is :"<<th2<<endl;
@@ -208,13 +205,15 @@ th2*=(M_PI/180);
 float co_s=cos(-th2);
 float si_n=sin(-th2);
 for(int i=0;i<le/2;i++){
-     //  cout<<((subtract_angles(atan2(f3[i].Q,f3[i].i),-th2))*(180/M_PI))<<",   ";
 short x=f3[i].real()*co_s-f3[i].imag()*si_n;
 short y =f3[i].real()*si_n+f3[i].imag()*co_s;
 
 f3[i]=std::complex<double>(x,y);
-cout<<"("<<x<<","<<y<<")"<<",   ";
+//cout<<"("<<x<<","<<y<<")"<<",   ";
 }
+auto E = chrono::steady_clock::now();
+auto duration = chrono::duration_cast<chrono::microseconds>(E - s);
+cout << "Elapsed: " <<duration.count() << " us\n";
 for(int i=0, d=0; i < le/2; i += 4, d++)
 {
     unsigned char da = 0;
